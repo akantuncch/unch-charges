@@ -11,6 +11,8 @@ output: html_document
 ```{r setup, echo=FALSE}
 library(tidyverse)
 library(janitor)
+library(hrbrthemes)
+library(ggridges)
 
 charges <- read_csv("data/561118388_uncmedicalcenter_cdmstandardcharges.csv")
 ```
@@ -46,4 +48,31 @@ charges$bcbs_medicare_advantage = as.numeric(gsub("[\\$,]", "", charges$bcbs_med
 charges$bcbs_unc_health_alliance = as.numeric(gsub("[\\$,]", "", charges$bcbs_unc_health_alliance))
 charges$cash_discount = as.numeric(gsub("[\\$,]", "", charges$cash_discount))
 ```
+
+```{r index}
+charges <- tibble::rowid_to_column(charges, "index")
+```
+
+
+```{r plot warning = FALSE}
+charges %>%
+  select(index, price, charge_description, cpt_hcpcs) %>% 
+  slice_max(price, n = 10) %>% 
+  ggplot(., aes(), group = 10) + 
+    geom_col(aes(x = charge_description, y = price)) + 
+      scale_x_discrete(label = function(x) stringr::str_trunc(x, 25)) +
+#coord_flip() + 
+      labs(title = "Top 10 Most Expensive Procedures",
+           subtitle="UNC Medical Center, Aug 2021",
+           x = "",
+           y = "Price (US Dollars)") + 
+      guides(x = guide_axis(n.dodge = 5)) +
+      theme_ipsum_rc()
+
+
+ggsave("top10charges.png")
+
+```
+
+
 
