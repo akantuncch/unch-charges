@@ -37,7 +37,28 @@ So it looks like we have charge bundles, standard prices, ranges (min, max) and 
 
 ## Wrangle
 
+Let's organize Payor columns into a more manageable format.
+
+```{r wrangle_col}
+charges_cln <- charges %>%
+  # Wrangle payor columns to key:value pair
+  pivot_longer(
+    cols = aetna:united_healthcare_medicare_advantage,
+    names_to = "payor",
+    values_to = "charge"
+    )
+```
+
+
 Looks like most our charge data is not numeric. 
+
+```{r convert-charge-cln}
+# Remove $ and , from string, convert to numeric
+charges_cln$price = as.numeric(gsub("[\\$,]", "", charges_cln$price))
+charges_cln$min = as.numeric(gsub("[\\$,]", "", charges_cln$min))
+charges_cln$max = as.numeric(gsub("[\\$,]", "", charges_cln$max))
+charges_cln$charge = as.numeric(gsub("[\\$,]", "", charges_cln$charge))
+```
 
 ```{r convert-charge}
 # Remove $ and , from string, convert to numeric
@@ -45,9 +66,6 @@ charges$price = as.numeric(gsub("[\\$,]", "", charges$price))
 charges$min = as.numeric(gsub("[\\$,]", "", charges$min))
 charges$max = as.numeric(gsub("[\\$,]", "", charges$max))
 charges$bcbs = as.numeric(gsub("[\\$,]", "", charges$bcbs))
-charges$bcbs_medicare_advantage = as.numeric(gsub("[\\$,]", "", charges$bcbs_medicare_advantage))
-charges$bcbs_unc_health_alliance = as.numeric(gsub("[\\$,]", "", charges$bcbs_unc_health_alliance))
-charges$cash_discount = as.numeric(gsub("[\\$,]", "", charges$cash_discount))
 ```
 
 ```{r index}
@@ -75,7 +93,7 @@ ggsave("images/top10charges.jpg")
 
 ```
 
-```{r all-charges, warning = FALSE}
+```{r all-std-charges, warning = FALSE}
 charges %>%
   select(index, price, charge_description, cpt_hcpcs) %>% 
   ggplot(aes(x = index, y = price, label = charge_description)) + 
@@ -92,23 +110,19 @@ charges %>%
       segment.ncp = 3,
       segment.angle = 20
       ) +
+    # Add Title, subtitle and axis labels
     labs(title = "Charge Bundles at UNC Health",
       subtitle="UNC Medical Center, Aug 2021",
       x = "Procedure Code",
       y = "Price (US Dollars)") + 
+    # Add theme from hrbrthemes lib
     theme_ipsum_rc()
 
+# Save output
 ggsave("images/allcharges.jpg")
 ```  
-  
-    geom_col(aes(x = charge_description, y = price)) + 
-      scale_x_discrete(label = function(x) stringr::str_trunc(x, 12)) +
-#coord_flip() + 
-      labs(title = "Top 10 Most Expensive Procedures",
-           subtitle="UNC Medical Center, Aug 2021",
-           x = "",
-           y = "Price (US Dollars)") + 
-      guides(x = guide_axis(n.dodge = 5)) +
-      theme_ipsum_rc()
-```
+
+
+
+
 
