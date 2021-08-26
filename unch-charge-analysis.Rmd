@@ -1,0 +1,49 @@
+---
+title: "UNC Health Charges"
+author: "Andrew Kant"
+date: "8/25/2021"
+output: html_document
+  toc: true
+  toc_float: true
+  number_sections: true
+---
+
+```{r setup, echo=FALSE}
+library(tidyverse)
+library(janitor)
+
+charges <- read_csv("data/561118388_uncmedicalcenter_cdmstandardcharges.csv")
+```
+
+# Introduction
+
+
+# Data
+
+Let's take a quick look at the data with `glimpse`
+
+```{r}
+charges
+#clean column names
+charges <- clean_names(charges)
+
+glimpse(charges)
+```
+
+So it looks like we have charge bundles, standard prices, ranges (min, max) and payor-specific charges in this dataset. 
+
+## Wrangle
+
+Looks like most our charge data is not numeric. 
+
+```{r convert-charge}
+# Remove $ and , from string, convert to numeric
+charges$price = as.numeric(gsub("[\\$,]", "", charges$price))
+charges$min = as.numeric(gsub("[\\$,]", "", charges$min))
+charges$max = as.numeric(gsub("[\\$,]", "", charges$max))
+charges$bcbs = as.numeric(gsub("[\\$,]", "", charges$bcbs))
+charges$bcbs_medicare_advantage = as.numeric(gsub("[\\$,]", "", charges$bcbs_medicare_advantage))
+charges$bcbs_unc_health_alliance = as.numeric(gsub("[\\$,]", "", charges$bcbs_unc_health_alliance))
+charges$cash_discount = as.numeric(gsub("[\\$,]", "", charges$cash_discount))
+```
+
