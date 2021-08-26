@@ -13,6 +13,7 @@ library(tidyverse)
 library(janitor)
 library(hrbrthemes)
 library(ggridges)
+library(ggrepel)
 
 charges <- read_csv("data/561118388_uncmedicalcenter_cdmstandardcharges.csv")
 ```
@@ -54,7 +55,7 @@ charges <- tibble::rowid_to_column(charges, "index")
 ```
 
 
-```{r plot warning = FALSE}
+```{r top10, warning = FALSE}
 charges %>%
   select(index, price, charge_description, cpt_hcpcs) %>% 
   slice_max(price, n = 10) %>% 
@@ -70,9 +71,44 @@ charges %>%
       theme_ipsum_rc()
 
 
-ggsave("top10charges.png")
+ggsave("images/top10charges.jpg")
 
 ```
 
+```{r all-charges, warning = FALSE}
+charges %>%
+  select(index, price, charge_description, cpt_hcpcs) %>% 
+  ggplot(aes(x = index, y = price, label = charge_description)) + 
+    geom_point(aes(), size = 1, alpha = 0.1) +
+    # Highlight procedures > $75,000 in red
+    geom_point(data = charges[charges$price > 75000,], alpha = 0.5, color = "red", size = 2,) +
+    # Only label procedures > $75,000 and avoid overlap
+    geom_text_repel(data = charges[charges$price > 75000,], 
+      size = 2.5,
+      nudge_x = .15,
+      box.padding = 0.5,
+      nudge_y = 1,
+      segment.curvature = -0.1,
+      segment.ncp = 3,
+      segment.angle = 20
+      ) +
+    labs(title = "Charge Bundles at UNC Health",
+      subtitle="UNC Medical Center, Aug 2021",
+      x = "Procedure Code",
+      y = "Price (US Dollars)") + 
+    theme_ipsum_rc()
 
+ggsave("images/allcharges.jpg")
+```  
+  
+    geom_col(aes(x = charge_description, y = price)) + 
+      scale_x_discrete(label = function(x) stringr::str_trunc(x, 12)) +
+#coord_flip() + 
+      labs(title = "Top 10 Most Expensive Procedures",
+           subtitle="UNC Medical Center, Aug 2021",
+           x = "",
+           y = "Price (US Dollars)") + 
+      guides(x = guide_axis(n.dodge = 5)) +
+      theme_ipsum_rc()
+```
 
