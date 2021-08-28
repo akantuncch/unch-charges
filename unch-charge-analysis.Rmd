@@ -3,14 +3,16 @@ title: "UNC Health Charges"
 author: "Andrew Kant"
 date: "8/25/2021"
 output: html_document
+<<<<<<< HEAD
 
+=======
+>>>>>>> 66efe543af3f9a1fd2aa7cc5bda8d4923250c749
 ---
 
 ```{r setup, echo=FALSE}
 library(tidyverse)
 library(janitor)
 library(hrbrthemes)
-library(ggridges)
 library(ggrepel)
 
 charges <- read_csv("data/561118388_uncmedicalcenter_cdmstandardcharges.csv")
@@ -115,10 +117,11 @@ charges %>%
       x = "Procedure Code",
       y = "Price (US Dollars)") + 
     # Add theme from hrbrthemes lib
-    theme_ipsum_rc()
+    theme_ipsum_rc() + 
+    coord_cartesian(clip = "off")
 
 # Save output
-ggsave("images/allcharges.jpg")
+ggsave("images/allcharges.png")
 ```  
 
 ```{r payor-compare}
