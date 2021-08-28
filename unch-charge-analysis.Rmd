@@ -3,9 +3,7 @@ title: "UNC Health Charges"
 author: "Andrew Kant"
 date: "8/25/2021"
 output: html_document
-  toc: true
-  toc_float: true
-  number_sections: true
+
 ---
 
 ```{r setup, echo=FALSE}
@@ -70,6 +68,7 @@ charges$bcbs = as.numeric(gsub("[\\$,]", "", charges$bcbs))
 
 ```{r index}
 charges <- tibble::rowid_to_column(charges, "index")
+charges_cln <- tibble::rowid_to_column(charges_cln, "index_cln")
 ```
 
 
@@ -122,6 +121,22 @@ charges %>%
 ggsave("images/allcharges.jpg")
 ```  
 
+```{r payor-compare}
+ggplot(charges_cln, aes(x = charge, y = payor)) +
+  geom_density_ridges(rel_min_height = 0.01) +
+  scale_y_discrete(expand = c(0, 0)) +
+  scale_x_continuous(limits = c(1, 1000), expand = c(0, 0.01)) +
+  scale_fill_brewer(palette = 4) +
+    labs(
+        x = "Price (USD)",
+        y = "Payor",
+        title = "Healthcare Insurance Comparison",
+        subtitle = "Care Charge Bundles (n = 5011)",
+        caption = "Andrew Kant | Source: UNC Health") + 
+  theme_ridges() + theme(legend.position = "none")
+
+ggsave("images/payorcompare.jpg")
+```
 
 
 
