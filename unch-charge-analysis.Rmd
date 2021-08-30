@@ -3,10 +3,6 @@ title: "UNC Health Charges"
 author: "Andrew Kant"
 date: "8/25/2021"
 output: html_document
-<<<<<<< HEAD
-
-=======
->>>>>>> 66efe543af3f9a1fd2aa7cc5bda8d4923250c749
 ---
 
 ```{r setup, echo=FALSE}
