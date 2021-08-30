@@ -9,6 +9,7 @@ output: html_document
 library(tidyverse)
 library(janitor)
 library(hrbrthemes)
+library(ggridges)
 library(ggrepel)
 
 charges <- read_csv("data/561118388_uncmedicalcenter_cdmstandardcharges.csv")
