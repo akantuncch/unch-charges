@@ -88,10 +88,6 @@ charges %>%
            y = "Price (US Dollars)") + 
       guides(x = guide_axis(n.dodge = 5)) +
       theme_ipsum_rc()
-
-
-ggsave("images/top10charges.jpg")
-
 ```
 
 ```{r all-std-charges, warning = FALSE}
@@ -119,9 +115,6 @@ charges %>%
     # Add theme from hrbrthemes lib
     theme_ipsum_rc() + 
     coord_cartesian(clip = "off")
-
-# Save output
-ggsave("images/allcharges.png")
 ```  
 
 ```{r payor-compare}
@@ -138,7 +131,6 @@ ggplot(charges_cln, aes(x = charge, y = payor)) +
         caption = "Andrew Kant | Source: UNC Health") + 
   theme_ridges() + theme(legend.position = "none")
 
-ggsave("images/payorcompare.jpg")
 ```
 
 
