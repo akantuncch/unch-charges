@@ -82,8 +82,9 @@ charges %>%
       labs(title = "Top 10 Most Expensive Procedures",
            subtitle="UNC Medical Center, Aug 2021",
            x = "",
-           y = "Price (US Dollars)") + 
-      guides(x = guide_axis(n.dodge = 5)) +
+           y = "Price (US Dollars)",
+           caption = "Source | UNC Health") + 
+      guides(x = guide_axis(angle = -20)) +
       theme_ipsum_rc()
 ```
 
@@ -108,24 +109,25 @@ charges %>%
     labs(title = "Charge Bundles at UNC Health",
       subtitle="UNC Medical Center, Aug 2021",
       x = "Procedure Code",
-      y = "Price (US Dollars)") + 
+      y = "Price (US Dollars)", 
+      caption = "Source | UNC Health") + 
     # Add theme from hrbrthemes lib
     theme_ipsum_rc() + 
     coord_cartesian(clip = "off")
 ```  
 
-```{r payor-compare}
+```{r payor-compare, warning = FALSE, message = FALSE}
 ggplot(charges_cln, aes(x = charge, y = payor)) +
   geom_density_ridges(rel_min_height = 0.01) +
   scale_y_discrete(expand = c(0, 0)) +
-  scale_x_continuous(limits = c(1, 1000), expand = c(0, 0.01)) +
+  scale_x_continuous(limits = c(1, 750), expand = c(0, 0.01)) +
   scale_fill_brewer(palette = 4) +
     labs(
         x = "Price (USD)",
         y = "Payor",
         title = "Healthcare Insurance Comparison",
         subtitle = "Care Charge Bundles (n = 5011)",
-        caption = "Andrew Kant | Source: UNC Health") + 
+        caption = "Source | UNC Health") + 
   theme_ridges() + theme(legend.position = "none")
 
 ```
