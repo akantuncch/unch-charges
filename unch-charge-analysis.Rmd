@@ -12,7 +12,9 @@ library(hrbrthemes)
 library(ggridges)
 library(ggrepel)
 
-charges <- read_csv("data/561118388_uncmedicalcenter_cdmstandardcharges.csv")
+charges <- read_csv("data/561118388_uncmedicalcenter_cdmstandardcharges.csv",
+                    #clean column names
+                    name_repair = make_clean_names)
 ```
 
 # Introduction
@@ -23,12 +25,20 @@ charges <- read_csv("data/561118388_uncmedicalcenter_cdmstandardcharges.csv")
 Let's take a quick look at the data with `glimpse`
 
 ```{r}
-charges
-#clean column names
-charges <- clean_names(charges)
-
-glimpse(charges)
+introduce(charges)
+plot_intro(charges)
 ```
+
+```{r missing}
+plot_missing(charges)
+```
+
+
+
+
+
+
+
 
 So it looks like we have charge bundles, standard prices, ranges (min, max) and payor-specific charges in this dataset. 
 
@@ -69,6 +79,17 @@ charges$bcbs = as.numeric(gsub("[\\$,]", "", charges$bcbs))
 charges <- tibble::rowid_to_column(charges, "index")
 charges_cln <- tibble::rowid_to_column(charges_cln, "index_cln")
 ```
+
+
+
+```{r}
+plot_histogram(charges_cln)
+```
+
+```{r}
+plot_correlation(na.omit(charges_cln), maxcat = 5L)
+```
+
 
 
 ```{r top10, warning = FALSE}
