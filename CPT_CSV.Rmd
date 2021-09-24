@@ -1,0 +1,85 @@
+---
+title: "CPT_CCS"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+```
+
+## TO DO
+
+ - Deal with alphanumeric codes (pull out [a-z]? then merge back?)
+ - Create explict codes within range
+
+```{r import-ccs-cpt}
+cpt <- read_csv("~/unch-charges/data/CCS_ServicesProcedures_v2021-1/CCS_services_procedures_v2021-1.csv", skip = 1)
+```
+
+
+```{r string-extract}
+#x <- '61000-61001'
+
+#str_extract_all(x, "\\w+")
+
+y <- 'C1898-C1899'
+
+var1 <- str_extract_all(y, "\\w+")
+d <-  str_extract_all(var1, "[[:upper:]]+")
+
+var1
+d
+
+
+```
+
+```{r}
+cpt_split_code_range <- cpt %>%
+  mutate(
+    remove_quote = str_replace_all(`Code Range`, "'", ""),
+    code_beg = str_extract_all(remove_quote, "\\w+", simplify = TRUE)[,1],
+    code_end = str_extract_all(remove_quote, "\\w+", simplify = TRUE)[,2],
+    alpha_prefix_beg = str_sub(code_beg, 1, 1),
+    alpha_rmdr_beg = str_sub(code_beg, 2),
+    alpha_prefix_end = str_sub(code_end, 1, 1),
+    alpha_rmdr_end = str_sub(code_end, 2)
+    )
+
+
+```
+
+```{r}
+test <- as.numeric(c("9930", "9932"))
+seq.int(test)
+```
+
+
+```{r}
+cpt2 <- cpt %>%
+  mutate(
+    col1 = str_extract_all(`Code Range`, "\\w+"))
+    
+    
+    #col1 = str_extract_all('Code Range', "[[:upper:]]+"))
+
+#,
+##    col2 = str_extract_all(col1, "\\w+")
+#  )
+```
+
+```{r}
+SplitMe <- function(string, alphaFirst = TRUE) {
+  Pattern <- ifelse(isTRUE(alphaFirst), "(?<=[a-zA-Z])(?=[0-9])", "(?<=[0-9])(?=[a-zA-Z])")
+  strsplit(string, split = Pattern, perl = T)
+}
+
+String <- cpt$`Code Range`
+SplitMe(String)
+```
+
+```{r}
+cpt3 <- cpt %>%
+  mutate(
+    col4 = str_extract_all(`Code Range`, "[[:upper:]]+")
+  )
+```
