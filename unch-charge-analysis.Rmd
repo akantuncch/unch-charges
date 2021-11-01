@@ -63,8 +63,12 @@ charges_long <- charges %>%
   pivot_longer(
     cols = aetna:united_healthcare_medicare_advantage,
     names_to = "payor",
-    values_to = "charge"
+    values_to = "charge",
     )
+
+plot_missing(charges_long)
+introduce(charges_long)
+plot_intro(charges_long)
 ```
 
 
@@ -76,6 +80,9 @@ charges_long$price = as.integer(gsub("[\\$,]", "", charges_long$price))
 charges_long$min = as.integer(gsub("[\\$,]", "", charges_long$min))
 charges_long$max = as.integer(gsub("[\\$,]", "", charges_long$max))
 charges_long$charge = as.integer(gsub("[\\$,]", "", charges_long$charge))
+
+plot_missing(charges_long)
+introduce(charges_long)
 ```
 
 ```{r convert-charge-WARNING}
@@ -84,6 +91,27 @@ charges$price = as.integer(gsub("[\\$,]", "", charges$price))
 charges$min = as.integer(gsub("[\\$,]", "", charges$min))
 charges$max = as.integer(gsub("[\\$,]", "", charges$max))
 charges$bcbs = as.integer(gsub("[\\$,]", "", charges$bcbs))
+```
+
+```{r charges-wider-WORKING}
+charges_wide <- charges_long %>%
+                  select(-facility_name) %>%
+                  pivot_wider(names_from = "payor",
+                    values_from = "charge",
+                    names_glue="{.value}_{payor}",
+                    values_fill=0) %>%
+                  mutate(index_cluster=1:nrow(.)) %>%
+                  arrange(runif(nrow(.)));
+
+
+# Pivot Wider for matrix operations?
+# charges_wide <- charges_long %>%
+#     arrange(cpt_hcpcs) %>%
+#     pivot_wider(id_cols=c("index_long","cpt_hcpcs"),
+#                 names_from="payor",
+#                 values_from="charge") %>%
+#     mutate(index_cluster=1:nrow(.)) %>%
+#     arrange(runif(nrow(.)));
 ```
 
 ```{r index}
@@ -183,17 +211,141 @@ charges_wide <- charges_long %>%
 
 
 #Create matrix
-price_matrix <- charges_wide %>% select(XXXXX) %>% as.matrix();
+price_matrix <- charges_wide %>% select(-charge_description, -cpt_hcpcs) %>% as.matrix();
 
-km_results <- kmeans(na.omit(price_matrix),3, nstart = 25)
+# km_results <- kmeans(na.omit(price_matrix),3, nstart = 25)
+
+price_matrix_valid <- na.omit(price_matrix)
+
+km_results <- kmeans(price_matrix_valid,3, nstart = 25)
 km_results;
+
+#Scale data
+pmv_scaled <- scale(price_matrix_valid)
+
+set.seed(123)
+km.price <- kmeans(scale(price_matrix_valid), 4, nstart = 25)
+library("factoextra")
+fviz_cluster(km.price, data = pmv_scaled,
+             palette = c("#00AFBB","#2E9FDF", "#E7B800", "#FC4E07"),
+             ggtheme = theme_minimal(),
+             main = "Partitioning Clustering Plot"
+             )
 ```
 
-```{r cluster-plot1}
-charges_clustering <- charges_long %>% left_join(charges_wide %>%
-                                      mutate(cluster=km_results$cluster) %>%
-                                      select(charge_description, cpt_hcpcs, cluster),
-                                      by=c("facility_name","cpt_hcpcs", "payor"))
+```{r elbow}
+library(factoextra)
+library(NbClust)
+
+fviz_nbclust(price_matrix_valid, kmeans, method = "wss") +
+  geom_vline(xintercept = 4, linetype = 2) + # add line for better visualisation
+  labs(subtitle = "Elbow method") # add subtitle
+
+
 ```
 
+```{r Silhouette }
+fviz_nbclust(price_matrix_valid, kmeans, method = "silhouette") +
+  labs(subtitle = "Silhouette method")
+```
+
+```{r NbClust}
+nbclust_out <- NbClust(
+  data = price_matrix_valid,
+  distance = "euclidean",
+  min.nc = 2, # minimum number of clusters
+  max.nc = 4, # maximum number of clusters
+  method = "kmeans" # one of: "ward.D", "ward.D2", "single", "complete", "average", "mcquitty", "median", "centroid", "kmeans"
+)
+
+```
+```{r}
+library(cluster)
+set.seed(42)
+km.price <- kmeans(price_matrix_valid, centers = 3, nstart = 20)
+
+sil <- silhouette(km.price$cluster, dist(price_matrix_valid))
+
+fviz_silhouette(sil)
+```
+
+```{r dataquality}
+# There are 816 NAs in cpt_hcpcs col
+colSums(is.na(charges_wide))
+
+library(skimr)
+charges_wide %>% skim()
+
+
+```
+
+```{r plot-qc1}
+# Quick visualizations
+ggplot(data = charges_wide) +
+  geom_histogram(mapping = aes(x = price), binwidth = 1000) +
+  labs(subtitle = "Wide Data")
+
+ggplot(data = charges_long) +
+  geom_histogram(mapping = aes(x = charge), binwidth = 1000) +
+  labs(subtitle = "Long Data")
+
+ggplot(data = charges_long, mapping = aes(x = charge, y = ..density..)) + 
+  geom_freqpoly(mapping = aes(color = payor), binwidth = 10000) +
+  theme(legend.position="none") +
+  labs(subtitle = "Long Data")
+
+```
+
+```{r plot-heatmap}
+charges_long %>%
+  count(charge, payor) %>%  
+  ggplot(mapping = aes(x = payor, y = charge)) +
+    geom_tile(mapping = aes(fill = n))  +
+  labs(subtitle = "Long Data")
+```
+
+```{r scatter}
+ggplot(data = charges_long) +
+  geom_point(mapping = aes(x = price, y = charge), alpha = 1 / 100) +
+  labs(subtitle = "Long Data")
+```
+```{r hexbin}
+ggplot(data = charges_long) +
+  geom_bin2d(mapping = aes(x = price, y = charge)) +
+  labs(subtitle = "Long Data")
+
+```
+
+```{r}
+# install.packages("hexbin")
+ggplot(data = charges_long) +
+  geom_hex(mapping = aes(x = payor, y = charge), bins = 60) +
+  labs(subtitle = "Long Data")
+```
+
+
+
+```{r payors-tbl}
+# REMEMBER TO FILTER VALUES > 0
+payors <- charges_long2 %>%
+  select(payor, charge, cpt_hcpcs, charge_description)
+```
+
+```{r}
+ggplot(data = payors) +
+  geom_point(mapping = aes(x = payor, y = charge), alpha = 1 / 100) +
+    labs(subtitle = "Payors - Long Data")
+```
+
+```{r na-payors}
+payor_ct <- payors %>% 
+  group_by(payor) %>% 
+  count(payor) %>% 
+  arrange(desc(n)) %>%
+  filter(n < 100)
+
+ggplot(data = payor_ct) +
+  geom_col(mapping = aes(x = payor, y = n))
+
+```
 
