@@ -12,6 +12,8 @@ library(hrbrthemes)
 library(ggridges)
 library(ggrepel)
 library(haven)
+library(DataExplorer)
+library(matlab)
 
 charges <- read_csv("data/561118388_uncmedicalcenter_cdmstandardcharges.csv",
                     #clean column names
@@ -56,7 +58,7 @@ So it looks like we have charge bundles, standard prices, ranges (min, max) and 
 Let's organize Payor columns into a more manageable format.
 
 ```{r wrangle_col}
-charges_cln <- charges %>%
+charges_long <- charges %>%
   # Wrangle payor columns to key:value pair
   pivot_longer(
     cols = aetna:united_healthcare_medicare_advantage,
@@ -68,35 +70,36 @@ charges_cln <- charges %>%
 
 Looks like most our charge data is not numeric. 
 
-```{r convert-charge-cln}
+```{r convert-charge-long}
 # Remove $ and , from string, convert to numeric
-charges_cln$price = as.numeric(gsub("[\\$,]", "", charges_cln$price))
-charges_cln$min = as.numeric(gsub("[\\$,]", "", charges_cln$min))
-charges_cln$max = as.numeric(gsub("[\\$,]", "", charges_cln$max))
-charges_cln$charge = as.numeric(gsub("[\\$,]", "", charges_cln$charge))
+charges_long$price = as.integer(gsub("[\\$,]", "", charges_long$price))
+charges_long$min = as.integer(gsub("[\\$,]", "", charges_long$min))
+charges_long$max = as.integer(gsub("[\\$,]", "", charges_long$max))
+charges_long$charge = as.integer(gsub("[\\$,]", "", charges_long$charge))
 ```
 
-```{r convert-charge}
+```{r convert-charge-WARNING}
 # Remove $ and , from string, convert to numeric
-charges$price = as.numeric(gsub("[\\$,]", "", charges$price))
-charges$min = as.numeric(gsub("[\\$,]", "", charges$min))
-charges$max = as.numeric(gsub("[\\$,]", "", charges$max))
-charges$bcbs = as.numeric(gsub("[\\$,]", "", charges$bcbs))
+charges$price = as.integer(gsub("[\\$,]", "", charges$price))
+charges$min = as.integer(gsub("[\\$,]", "", charges$min))
+charges$max = as.integer(gsub("[\\$,]", "", charges$max))
+charges$bcbs = as.integer(gsub("[\\$,]", "", charges$bcbs))
 ```
 
 ```{r index}
+# REVIEW Should index on original table and add before pivot_longer
 charges <- tibble::rowid_to_column(charges, "index")
-charges_cln <- tibble::rowid_to_column(charges_cln, "index_cln")
+charges_long <- tibble::rowid_to_column(charges_long, "index_long")
 ```
 
 
 
 ```{r}
-plot_histogram(charges_cln)
+plot_histogram(charges_long)
 ```
 
 ```{r}
-plot_correlation(na.omit(charges_cln), maxcat = 5L)
+plot_correlation(na.omit(charges_long), maxcat = 5L)
 ```
 
 
@@ -162,6 +165,35 @@ ggplot(charges_cln, aes(x = charge, y = payor)) +
 
 ```
 
+# Clustering 
 
+```{r clustering-prep}
+# Pivot Wider for matrix operations?
+charges_wide <- charges_long %>%
+    arrange(cpt_hcpcs) %>%
+    pivot_wider(id_cols=c("index_long","cpt_hcpcs"),
+                names_from="payor",
+                values_from="charge") %>%
+    mutate(index_cluster=1:nrow(.)) %>%
+    arrange(runif(nrow(.)));
+```
+
+
+```{r kmeans}
+
+
+#Create matrix
+price_matrix <- charges_wide %>% select(XXXXX) %>% as.matrix();
+
+km_results <- kmeans(na.omit(price_matrix),3, nstart = 25)
+km_results;
+```
+
+```{r cluster-plot1}
+charges_clustering <- charges_long %>% left_join(charges_wide %>%
+                                      mutate(cluster=km_results$cluster) %>%
+                                      select(charge_description, cpt_hcpcs, cluster),
+                                      by=c("facility_name","cpt_hcpcs", "payor"))
+```
 
 
