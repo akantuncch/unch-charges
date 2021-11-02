@@ -5,6 +5,8 @@ output: html_document
 
 ```{r setup, include=FALSE}
 library(tidyverse)
+library(janitor)
+library(DataExplorer)
 ```
 
 ## TO DO
@@ -12,74 +14,143 @@ library(tidyverse)
  - Deal with alphanumeric codes (pull out [a-z]? then merge back?)
  - Create explict codes within range
 
-```{r import-ccs-cpt}
-cpt <- read_csv("~/unch-charges/data/CCS_ServicesProcedures_v2021-1/CCS_services_procedures_v2021-1.csv", skip = 1)
+## WORKING
+
+```{r import-hcpcs, warning=FALSE}
+hcpcs_src <- readxl::read_xlsx("~/unch-charges/data/HCPCS/HCPC2021_OCT_ANWEB.xlsx")
+
+betos_src <- read_csv("~/unch-charges/data/betos.csv",
+                    #clean column names
+                    name_repair = janitor::make_clean_names)
+
+nc_crosswalk_src <- read_csv("~/unch-charges/data/nc_crosswalk.csv")
 ```
 
+```{r counts}
+betos_count <- hcpcs_src %>%
+  distinct(BETOS) %>%
+  count()
 
-```{r string-extract}
-#x <- '61000-61001'
+nc_crosswalk_src <- clean_names(nc_crosswalk_src)
 
-#str_extract_all(x, "\\w+")
-
-y <- 'C1898-C1899'
-
-var1 <- str_extract_all(y, "\\w+")
-d <-  str_extract_all(var1, "[[:upper:]]+")
-
-var1
-d
-
-
-```
-
-```{r}
-cpt_split_code_range <- cpt %>%
-  mutate(
-    remove_quote = str_replace_all(`Code Range`, "'", ""),
-    code_beg = str_extract_all(remove_quote, "\\w+", simplify = TRUE)[,1],
-    code_end = str_extract_all(remove_quote, "\\w+", simplify = TRUE)[,2],
-    alpha_prefix_beg = str_sub(code_beg, 1, 1),
-    alpha_rmdr_beg = str_sub(code_beg, 2),
-    alpha_prefix_end = str_sub(code_end, 1, 1),
-    alpha_rmdr_end = str_sub(code_end, 2)
-    )
-
+category <- nc_crosswalk_src %>%
+  group_by(description) %>%
+  distinct(description)
 
 ```
 
-```{r}
-test <- as.numeric(c("9930", "9932"))
-seq.int(test)
+```{r betos}
+betos_src %>% head()
+
+betos_xwalk <- hcpcs_src %>%
+  inner_join(betos_src, by = c("BETOS" = "permissible_value"), keep = TRUE)
+
+betos_xwalk <- clean_names(betos_xwalk)
 ```
 
-
-```{r}
-cpt2 <- cpt %>%
-  mutate(
-    col1 = str_extract_all(`Code Range`, "\\w+"))
-    
-    
-    #col1 = str_extract_all('Code Range', "[[:upper:]]+"))
-
-#,
-##    col2 = str_extract_all(col1, "\\w+")
-#  )
+```{r join-charges-category}
+charge_cat <- charges_long %>%
+  inner_join(nc_crosswalk_src, by = c("cpt_hcpcs" = "code"), keep = TRUE)
 ```
 
 ```{r}
-SplitMe <- function(string, alphaFirst = TRUE) {
-  Pattern <- ifelse(isTRUE(alphaFirst), "(?<=[a-zA-Z])(?=[0-9])", "(?<=[0-9])(?=[a-zA-Z])")
-  strsplit(string, split = Pattern, perl = T)
-}
-
-String <- cpt$`Code Range`
-SplitMe(String)
+introduce(charge_cat)
+charge_cat %>% plot_missing()
+charge_cat %>% head()
 ```
 
 ```{r}
-cpt3 <- cpt %>%
-  mutate(
-    col4 = str_extract_all(`Code Range`, "[[:upper:]]+")
-  )
+# Remove data we don't need 
+charge_cat2 <- charge_cat %>%
+  select(charge_description, cpt_hcpcs, price, payor, charge, description, op_srvc_ctg_short, ph_srvc_ctg_short)
+
+
+ggplot(data = charge_cat2) +
+  geom_bar(mapping = aes(x = fct_infreq(as.factor(description)))) +
+  coord_flip() +
+  labs(subtitle = "Quick Visualization")
+
+
 ```
+
+
+
+
+
+
+
+
+
+# OBSELETE
+<!-- ```{r import-ccs-cpt} -->
+<!-- <!-- cpt <- read_csv("~/unch-charges/data/CCS_ServicesProcedures_v2021-1/CCS_services_procedures_v2021-1.csv", skip = 1) --> -->
+<!-- ``` -->
+
+
+
+<!-- ```{r string-extract} -->
+<!-- #x <- '61000-61001' -->
+
+<!-- #str_extract_all(x, "\\w+") -->
+
+<!-- y <- 'C1898-C1899' -->
+
+<!-- var1 <- str_extract_all(y, "\\w+") -->
+<!-- d <-  str_extract_all(var1, "[[:upper:]]+") -->
+
+<!-- var1 -->
+<!-- d -->
+
+
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- cpt_split_code_range <- cpt %>% -->
+<!--   mutate( -->
+<!--     remove_quote = str_replace_all(`Code Range`, "'", ""), -->
+<!--     code_beg = str_extract_all(remove_quote, "\\w+", simplify = TRUE)[,1], -->
+<!--     code_end = str_extract_all(remove_quote, "\\w+", simplify = TRUE)[,2], -->
+<!--     alpha_prefix_beg = str_sub(code_beg, 1, 1), -->
+<!--     alpha_rmdr_beg = str_sub(code_beg, 2), -->
+<!--     alpha_prefix_end = str_sub(code_end, 1, 1), -->
+<!--     alpha_rmdr_end = str_sub(code_end, 2) -->
+<!--     ) -->
+
+
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- test <- as.numeric(c("9930", "9932")) -->
+<!-- seq.int(test) -->
+<!-- ``` -->
+
+
+<!-- ```{r} -->
+<!-- cpt2 <- cpt %>% -->
+<!--   mutate( -->
+<!--     col1 = str_extract_all(`Code Range`, "\\w+")) -->
+
+
+<!--     #col1 = str_extract_all('Code Range', "[[:upper:]]+")) -->
+
+<!-- #, -->
+<!-- ##    col2 = str_extract_all(col1, "\\w+") -->
+<!-- #  ) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- SplitMe <- function(string, alphaFirst = TRUE) { -->
+<!--   Pattern <- ifelse(isTRUE(alphaFirst), "(?<=[a-zA-Z])(?=[0-9])", "(?<=[0-9])(?=[a-zA-Z])") -->
+<!--   strsplit(string, split = Pattern, perl = T) -->
+<!-- } -->
+
+<!-- String <- cpt$`Code Range` -->
+<!-- SplitMe(String) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- cpt3 <- cpt %>% -->
+<!--   mutate( -->
+<!--     col4 = str_extract_all(`Code Range`, "[[:upper:]]+") -->
+<!--   ) -->
+<!-- ``` -->

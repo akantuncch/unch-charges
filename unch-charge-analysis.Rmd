@@ -195,7 +195,7 @@ ggplot(charges_cln, aes(x = charge, y = payor)) +
 
 # Clustering 
 
-```{r clustering-prep}
+```{r clustering-prep-OBSELETE}
 # Pivot Wider for matrix operations?
 charges_wide <- charges_long %>%
     arrange(cpt_hcpcs) %>%
