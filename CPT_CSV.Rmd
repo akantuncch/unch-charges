@@ -74,6 +74,97 @@ ggplot(data = charge_cat2) +
 ```
 
 
+```{r}
+summary(lm(charge ~ factor(description), data = charge_cat2))
+```
+```{r}
+summary(lm(price ~ factor(description), data = charge_cat2))
+```
+
+```{r}
+skim(charge_cat2)
+```
+
+
+```{r payor-high}
+payor_high <- charges_long %>% 
+  arrange(desc(charge)) %>%
+  group_by(payor) %>%
+  slice_max(charge, n = 5, with_ties = FALSE)
+
+
+  # group_by(payor, charge) %>% 
+  # summarize()
+```
+
+
+```{r}
+ggplot(payor_high, aes(x = charge_description, y = charge, color = payor)) +
+    geom_boxplot()+
+    geom_point(size = 2, position = position_jitter(width = 0.2)) +
+          scale_x_discrete(label = function(x) stringr::str_trunc(x, 25)) +
+    stat_summary(fun = mean, geom = "point", shape = 20, size = 6, color = "blue")+
+    theme_classic() +
+    theme(legend.position="none") +
+        guides(x = guide_axis(angle = -20))
+```
+
+```{r quality-check}
+plot_missing(charges_long, missing_only = TRUE)
+introduce(charges_long)
+plot_intro(charges_long)
+profile_missing(charges_long)
+```
+
+```{r}
+payor_test <- charges_long %>% 
+  drop_na() %>%
+  group_by(payor) %>%
+  select(!cpt_hcpcs) %>%
+  summarise(avg = mean(charge, na.rm=TRUE), mid = median(charge, na.rm=TRUE))
+
+ggplot(payor_test, aes(avg, mid)) + 
+  geom_point()
+```
+
+
+```{r}
+payor_test2 <- charges_long %>% 
+  drop_na() %>%
+  group_by(payor) %>%
+  distinct() %>%
+  add_count(charge) %>%
+  summarise(across(charge, sum)) %>%
+  mutate(wt = charge / 5011)
+  
+p1 <- ggplot(data = payor_test2, mapping = aes(x = reorder(payor, charge), charge)) + 
+  geom_bar(stat = "identity") + coord_flip()
+
+p2 <- ggplot(data = payor_test2, mapping = aes(x = reorder(payor, wt), wt)) + 
+  geom_bar(stat = "identity") + coord_flip()
+
+p1
+p2
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

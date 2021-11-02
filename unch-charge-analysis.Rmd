@@ -117,7 +117,7 @@ charges_wide <- charges_long %>%
 ```{r index}
 # REVIEW Should index on original table and add before pivot_longer
 charges <- tibble::rowid_to_column(charges, "index")
-charges_long <- tibble::rowid_to_column(charges_long, "index_long")
+#charges_long <- tibble::rowid_to_column(charges_long, "index_long")
 ```
 
 
@@ -327,7 +327,7 @@ ggplot(data = charges_long) +
 
 ```{r payors-tbl}
 # REMEMBER TO FILTER VALUES > 0
-payors <- charges_long2 %>%
+payors <- charges_long %>%
   select(payor, charge, cpt_hcpcs, charge_description)
 ```
 
@@ -343,9 +343,10 @@ payor_ct <- payors %>%
   count(payor) %>% 
   arrange(desc(n)) %>%
   filter(n < 100)
-
-ggplot(data = payor_ct) +
-  geom_col(mapping = aes(x = payor, y = n))
-
 ```
 
+
+```{r}
+ggplot(data = payor_ct) +
+  geom_col(mapping = aes(x = payor, y = n))
+```
