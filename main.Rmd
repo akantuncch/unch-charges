@@ -1,0 +1,244 @@
+---
+title: "main"
+output: html_document
+---
+
+# Setup --------------------------------- 
+
+```{r setup, echo=FALSE}
+library(tidyverse)
+library(janitor)
+library(hrbrthemes)
+library(ggridges)
+library(ggrepel)
+library(haven)
+library(DataExplorer)
+library(matlab)
+```
+
+# Load data ----------------------------- 
+
+```{r warning=FALSE}
+# Import data sources
+charges <- read_csv("data/561118388_uncmedicalcenter_cdmstandardcharges.csv",
+                name_repair = make_clean_names)
+
+betos <- read_csv("~/unch-charges/data/betos.csv",
+                name_repair = janitor::make_clean_names)
+
+crosswalk <- read_csv("~/unch-charges/data/nc_crosswalk.csv",
+                name_repair = janitor::make_clean_names)
+
+hcpcs <- readxl::read_xlsx("~/unch-charges/data/HCPCS/HCPC2021_OCT_ANWEB.xlsx")
+```
+# Preprocess ---------------------------
+
+```{r}
+# Clean DRG characters from col
+charges <- charges %>% 
+  mutate(code = str_remove(cpt_hcpcs, "MS-DRG: "))
+
+charges_long <- charges %>%
+  # Wrangle payor columns to key:value pair
+  pivot_longer(
+    cols = aetna:united_healthcare_medicare_advantage,
+    names_to = "payor",
+    values_to = "charge",
+    )
+
+
+# Remove $ and , from string, convert to numeric
+charges_long$price = as.double(gsub("[\\$,]", "", charges_long$price))
+charges_long$min = as.double(gsub("[\\$,]", "", charges_long$min))
+charges_long$max = as.double(gsub("[\\$,]", "", charges_long$max))
+charges_long$charge = as.double(gsub("[\\$,]", "", charges_long$charge))
+
+
+```
+
+
+```{r crossref-catagories}
+betos_hcpcs <- hcpcs %>%
+  inner_join(betos, by = c("BETOS" = "permissible_value"), keep = TRUE)
+
+betos_hcpcs <- clean_names(betos_hcpcs)
+
+# unique_cat <- betos_hcpcs %>%
+#   group_by(domain_meaning_name) %>%
+#   distinct
+
+charge_cat <- charges_long %>%
+  inner_join(betos_hcpcs, by = c("code" = "hcpc"), keep = TRUE) %>%
+  select(charge_description, code, price, min, max, payor, charge, domain_meaning_name, long_description)
+
+# All charges as 0 to 1 for matrices
+charge_cat[charge_cat == 0] <- 1
+
+charge_cat_wide <- charges_wide %>%
+    inner_join(betos_hcpcs, by = c("code" = "hcpc"), keep = TRUE) %>%
+    select(starts_with("charge_"), code, price, min, max, index_cluster, domain_meaning_name, long_description)
+
+charge_cat_wide_qualitycheck <- charges_wide %>%
+    left_join(betos_hcpcs, by = c("code" = "hcpc"), keep = TRUE) %>%
+    select(starts_with("charge_"), code, price, min, max, index_cluster, permissible_value, domain_meaning_name, long_description)
+
+charge_cat_wide[charge_cat_wide == 0] <- 1
+  
+```
+
+
+
+```{r}
+# Add column for medicare
+charges_cat_medicare <- charge_cat %>%
+  rowwise() %>% 
+  mutate(is_medicare = map_lgl(payor, ~any(str_detect(., "medicare"))))
+```
+
+
+
+```{r}
+check <- charge_cat %>%
+  group_by(payor) %>%
+  summarise(avg = mean(charge, na.rm=TRUE)) %>%
+  arrange(desc(avg)) %>%
+  filter(quantile(avg, 0.5)<avg)
+
+ggplot(check, aes(x = payor, y = avg)) +
+    geom_col() +
+    coord_flip()
+```
+
+
+```{r}
+charges_wide <- charges_long %>%
+                  select(-facility_name, -cpt_hcpcs) %>%
+                  pivot_wider(names_from = "payor",
+                    values_from = "charge",
+                    names_glue="{.value}_{payor}",
+                    values_fill=0) %>%
+                  mutate(index_cluster=1:nrow(.)) %>%
+                  arrange(runif(nrow(.)));
+
+# Replace numerical NA with column mean
+# charges_wide2 <-  for (i in which(sapply(charges_wide, is.numeric))) {
+  #   charges_wide[is.na(charges_wide[, i]), i] <- mean(charges_wide[, i],  na.rm = TRUE)
+  # }
+
+```
+
+
+
+```{r pca}
+charges_matrix <- charges_wide %>%
+  select(-charge_description, -code) %>%
+  as.matrix();
+
+library(missMDA)
+# estimate number of components
+nb <- estim_ncpPCA(charges_matrix, ncp.min=0, ncp.max=5)
+# actual impute
+charges_wide_impute <- imputePCA(charges_matrix, ncp=nb$ncp)
+
+pca_fit <- prcomp(charges_wide_impute$completeObs);
+  pca_fit$rotation
+pca_fit$rotation
+
+summary(pca_fit)
+
+library(factoextra)
+
+res.pca <- prcomp(charges_wide_impute$completeObs, scale = TRUE)
+
+fviz_eig(res.pca)
+
+fviz_pca_ind(res.pca,
+             col.ind = "cos2", 
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE)
+```
+
+
+```{r scatterplot warning=FALSE}
+# charges_long %>%
+#   select(price, payor, charge) %>% 
+  
+ggplot(charges_long, aes(x = price, y = charge, label = payor)) + 
+    geom_point(aes(), size = 1, alpha = 0.1) +
+    # Highlight procedures > $75,000 in red
+    geom_point(data = charges_long[charges_long$charge > 75000,], alpha = 0.5, color = "red", size = 2,) +
+    # Only label procedures > $75,000 and avoid overlap
+    geom_text_repel(data = charges_long[charges_long$charge > 75000,], 
+      size = 2.5,
+      nudge_x = .15,
+      box.padding = 0.5,
+      nudge_y = 1,
+      segment.curvature = -0.1,
+      segment.ncp = 3,
+      segment.angle = 20
+      ) +
+    # Add Title, subtitle and axis labels
+    labs(title = "Prices vs. Charges ",
+      subtitle="UNC Medical Center, Aug 2021",
+      x = "Price",
+      y = "Charge", 
+      caption = "Source | UNC Health") + 
+    # Add theme from hrbrthemes lib
+    theme_ipsum_rc() + 
+    coord_cartesian(clip = "off")
+```
+
+```{r ridgeplot warning=FALSE, message=FALSE}
+ggplot(charges_long, aes(x = charge, y = payor)) +
+  geom_density_ridges(rel_min_height = 0) +
+  scale_y_discrete(expand = c(0, 0)) +
+  scale_x_continuous(limits = c(1, 1000), expand = c(0, 0.01)) +
+  scale_fill_brewer(palette = 4) +
+    labs(
+        x = "Charge (USD)",
+        y = "Payor",
+        title = "Healthcare Insurance Comparison",
+        subtitle = "Healthcare Services (n = 5011)",
+        caption = "Source | UNC Health") + 
+  theme_ridges() + theme(legend.position = "none")
+```
+
+```{r}
+summary(charges_long)
+summary(charges_wide)
+```
+
+
+```{r}
+charges_wide_matrix <- charges_wide %>%
+  select_if(is.numeric) %>%
+  select(!index_cluster) %>%
+  arrange(desc(price), .by_group = TRUE) %>%
+  as.matrix()
+```
+
+
+```{r}
+heatmap(charges_wide_matrix, xlab="Payor", ylab="Charge Code", main="heatmap")
+```
+```{r}
+p <- charges_long %>%
+  select(payor, charge, price, code) %>%
+  filter(payor == "bcbs" | payor == "bcbs_medicare_advantage" | payor == "bcbs_unc_health_alliance" | payor == "blue_home") %>%
+  mutate(across(payor, as_factor))
+
+ggplot(p, aes(x=price, y=charge, color=payor)) + 
+  geom_point()
+```
+
+```{r lollipop }
+ggplot(p, aes(x=payor, y=charge)) +
+  geom_point() + 
+  geom_segment( aes(x=payor, xend=1, y=0, yend=1000))
+```
+
+
+# Wrangle  ----------------------------
+
+
+# Plot  -------------------------------
