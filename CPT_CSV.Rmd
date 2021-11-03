@@ -46,6 +46,10 @@ betos_xwalk <- hcpcs_src %>%
   inner_join(betos_src, by = c("BETOS" = "permissible_value"), keep = TRUE)
 
 betos_xwalk <- clean_names(betos_xwalk)
+
+betos_cat <- betos_xwalk %>%
+  group_by(domain_meaning_name) %>%
+  distinct(domain_meaning_name)
 ```
 
 ```{r join-charges-category}
