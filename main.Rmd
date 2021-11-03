@@ -67,12 +67,24 @@ betos_hcpcs <- clean_names(betos_hcpcs)
 #   group_by(domain_meaning_name) %>%
 #   distinct
 
+
+
 charge_cat <- charges_long %>%
   inner_join(betos_hcpcs, by = c("code" = "hcpc"), keep = TRUE) %>%
   select(charge_description, code, price, min, max, payor, charge, domain_meaning_name, long_description)
 
 # All charges as 0 to 1 for matrices
 charge_cat[charge_cat == 0] <- 1
+
+# Convert back to wide data
+charges_wide <- charges_long %>%
+                  select(-facility_name, -cpt_hcpcs) %>%
+                  pivot_wider(names_from = "payor",
+                    values_from = "charge",
+                    names_glue="{.value}_{payor}",
+                    values_fill=0) %>%
+                  mutate(index_cluster=1:nrow(.)) %>%
+                  arrange(runif(nrow(.)));
 
 charge_cat_wide <- charges_wide %>%
     inner_join(betos_hcpcs, by = c("code" = "hcpc"), keep = TRUE) %>%
@@ -86,14 +98,43 @@ charge_cat_wide[charge_cat_wide == 0] <- 1
   
 ```
 
+```{r EXPERIMENT}
+test <- charges_long %>%
+  inner_join(crosswalk, by = c("cpt_hcpcs" = "code"), keep = TRUE) %>%
+  select(charge_description, code.x, price, min, max, payor, charge, description) %>%
+  mutate(is.medicare = map_lgl(payor, ~any(str_detect(., "medicare"))))
 
+test_wide <- test %>%
+  pivot_wider(names_from = "payor",
+              values_from = "charge",
+              names_glue="{.value}_{payor}",
+              values_fill=0) %>%
+  mutate(index_cluster=1:nrow(.)) %>%
+  arrange(runif(nrow(.))) %>%
+  select(!is_medicare)
+
+# Changes is_medicare to TRUE
+test[test == 0] <- 1
+
+test_wide[test_wide == 0] <- 1
+
+```
 
 ```{r}
-# Add column for medicare
-charges_cat_medicare <- charge_cat %>%
-  rowwise() %>% 
-  mutate(is_medicare = map_lgl(payor, ~any(str_detect(., "medicare"))))
+
+ggplot(test) +
+  geom_bar(mapping = aes(x = fct_infreq(as.factor(description)))) +
+  coord_flip() +
+  labs(subtitle = "Quick Visualization")
+
+ggplot(test) +
+  geom_bar(mapping = aes(x = is.medicare)) +
+  coord_flip() +
+  labs(subtitle = "Quick Visualization")
+
 ```
+
+
 
 
 
@@ -109,16 +150,15 @@ ggplot(check, aes(x = payor, y = avg)) +
     coord_flip()
 ```
 
+```{r}
+lm1 <- lm(test$charge ~ test$is.medicare + test$description)
+summary(lm1)
+```
+
+
 
 ```{r}
-charges_wide <- charges_long %>%
-                  select(-facility_name, -cpt_hcpcs) %>%
-                  pivot_wider(names_from = "payor",
-                    values_from = "charge",
-                    names_glue="{.value}_{payor}",
-                    values_fill=0) %>%
-                  mutate(index_cluster=1:nrow(.)) %>%
-                  arrange(runif(nrow(.)));
+
 
 # Replace numerical NA with column mean
 # charges_wide2 <-  for (i in which(sapply(charges_wide, is.numeric))) {
