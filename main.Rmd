@@ -37,9 +37,10 @@ hcpcs <- readxl::read_xlsx("~/unch-charges/data/HCPCS/HCPC2021_OCT_ANWEB.xlsx")
 
 ```{r preprocess}
 
-# Remove unnecessary strings and pivot long
+# Remove unnecessary sub strings, pivot long, add medicare column, fix NA codes and add index
 charges_clean <- charges %>%
-  select(!facility_name) %>%
+  mutate(index_id = 1:nrow(.)) %>%
+  select(-facility_name, -cash_discount) %>%
   mutate(code = str_remove(cpt_hcpcs, "MS-DRG: "), .keep = "unused") %>%
   mutate(clean_description = str_remove(charge_description, "HC "),
          .keep = "unused") %>%
@@ -48,10 +49,10 @@ charges_clean <- charges %>%
     names_to = "payor",
     values_to = "charge",
   ) %>%
-  mutate(is.medicare = map_lgl(payor, ~ any(str_detect(., "medicare")) | (str_detect(., "humana_alignment")))) %>% # Note to lookup each for medicare
+  mutate(is.medicare = map_lgl(payor, ~ any(str_detect(., "medicare")) | (str_detect(., "humana")))) %>% # Note to lookup each for medicare
   mutate(across(payor, as_factor)) %>%
   mutate(code = replace_na(code, "NO CODE")) %>%
-  mutate(index_clean = 1:nrow(.)) %>%
+  mutate(index_long = 1:nrow(.)) %>%
   arrange(runif(nrow(.)))
 
 
@@ -63,29 +64,96 @@ charges_clean$charge = as.double(gsub("[\\$,]", "", charges_clean$charge))
 
 # regex for HC /^(?:HC )\b
 
-unique_payor <- distinct(charges_clean, payor)
+payor_list <- charges_clean$payor %>% unique() %>% tibble() %>% arrange(desc(.));
 
+```
+
+
+
+
+
+
+```{r outlier-detection}
+# Widen data to look at payor data quality
+charges_wide <- charges_clean %>%
+  select(-is.medicare, everything()) %>%
+  pivot_wider(
+    id_cols=c("index_id","code", "price", "min", "max", "clean_description"),
+    names_from = payor,
+    values_from = charge,
+#    names_glue = "{.value}_{payor}",
+    values_fill = 0
+  )
+
+# ggplot(charges_wide, aes(x = charge_crescent)) +
+#   geom_histogram(
+#     binwidth = 200,
+#     fill = "#69b3a2",
+#     color = "#e9ecef",
+#     alpha = 0.9
+#   ) +
+#   xlim(0, 2500)
+# ggtitle("Bin size = 200") +
+#   theme_ipsum() +
+#   theme(plot.title = element_text(size = 15))
+
+# outliers <- charges_clean %>%
+#   group_by(payor) %>%
+#   identify_outliers(charge)
+# 
+# charges_clean2 <- charges_clean %>% 
+#   anti_join(outliers, by = "index_long") 
+
+# Check descriptive stats on payors, remove skew lowest
+# drop_payors <- charges_wide %>%
+#   select(-price, -min, -max, -index_id) %>%
+#   get_summary_stats(show = c("mean", "sd", "median", "iqr")) %>%
+#   filter(median > 0)
+
+```
+
+
+
+```{r room-charges}
+room_charge <- charges_wide %>% 
+  filter(across(clean_description, ~ grepl('ROOM', .))) %>%
+  distinct(clean_description, .keep_all = TRUE) %>%
+  select(price, clean_description, index_id) %>%
+  mutate(clean_description = factor(clean_description))
+ 
+ggplot(room_charge, aes(reorder(clean_description, price), price)) +
+  geom_col(aes()) +
+  coord_flip() +
+  labs(subtitle = "Hospital Room Cost by Type")
 
 ```
 
 ```{r feat}
 # Add features for range and price/charge difference
-charges_clean_ft <- charges_clean %>%
+most_var <- charges_clean %>%
   filter(charge >= 1) %>%
   mutate(rng = max - min) %>%
   mutate(price_diff = charge - price)
 
+most_var_h <- most_var %>%
+  slice_max(price_diff, n = 10)
+
+
+
+
 # Output data changes
-print(sprintf("Before simplification and deduplication: %d, after %d (%0.2f %% decrease)",
-              nrow(charges_clean),
-              nrow(charges_clean_ft),
-              100-100*nrow(charges_clean_ft)/nrow(charges_clean)));
+# print(sprintf("Before simplification and deduplication: %d, after %d (%0.2f %% decrease)",
+#               nrow(charges_clean),
+#               nrow(charges_clean_ft),
+#               100-100*nrow(charges_clean_ft)/nrow(charges_clean)));
 
 # Recode NA codes
 # charges_clean_ft2 <- charges_clean_ft %>%
 #   mutate(code = replace_na(code, "NO CODE")) 
 
 ```
+
+
 ```{r charge-catagories}
 category <- charges_clean %>%
   inner_join(crosswalk, by = c("code" = "code"), keep = TRUE) %>%
@@ -96,31 +164,30 @@ print(sprintf("Before inner join: %d, after %d (%0.2f %% decrease)",
               nrow(category),
               100-100*nrow(category)/nrow(charges_clean)));
 
+cat_list <- category$description %>% unique() %>% tibble() %>% arrange(desc(.));
+
 ```
 
 
 
 ```{r crossref-catagories}
-betos_hcpcs <- hcpcs %>%
-  inner_join(betos, by = c("BETOS" = "permissible_value"), keep = TRUE)
-
-betos_hcpcs <- clean_names(betos_hcpcs)
-
-# unique_cat <- betos_hcpcs %>%
-#   group_by(domain_meaning_name) %>%
-#   distinct
-
-betos_cat <- charges_clean %>%
-  inner_join(betos_hcpcs, by = c("code" = "hcpc"), keep = TRUE) %>%
-  select(clean_description, code, price, min, max, payor, charge, domain_meaning_name, long_description)
-
-print(sprintf("Before simplification and join: %d, after %d (%0.2f %% decrease)",
-              nrow(betos_hcpcs),
-              nrow(charges_clean),
-              100-100*nrow(charges_clean)/nrow(betos_hcpcs)));
-
-
-
+# betos_hcpcs <- hcpcs %>%
+#   inner_join(betos, by = c("BETOS" = "permissible_value"), keep = TRUE)
+# 
+# betos_hcpcs <- clean_names(betos_hcpcs)
+# 
+# # unique_cat <- betos_hcpcs %>%
+# #   group_by(domain_meaning_name) %>%
+# #   distinct
+# 
+# betos_cat <- charges_clean %>%
+#   inner_join(betos_hcpcs, by = c("code" = "hcpc"), keep = TRUE) %>%
+#   select(clean_description, code, price, min, max, payor, charge, domain_meaning_name, long_description)
+# 
+# print(sprintf("Before simplification and join: %d, after %d (%0.2f %% decrease)",
+#               nrow(betos_hcpcs),
+#               nrow(charges_clean),
+#               100-100*nrow(charges_clean)/nrow(betos_hcpcs)));
 # charge_cat <- charges_long %>%
 #   inner_join(betos_hcpcs, by = c("code" = "hcpc"), keep = TRUE) %>%
 #   select(charge_description, code, price, min, max, payor, charge, domain_meaning_name, long_description)
@@ -134,14 +201,14 @@ print(sprintf("Before simplification and join: %d, after %d (%0.2f %% decrease)"
 # charge_cat[charge_cat == 0] <- 1
 
 # Convert back to wide data
-charges_wide <- charges_long %>%
-                  select(-facility_name, -cpt_hcpcs) %>%
-                  pivot_wider(names_from = "payor",
-                    values_from = "charge",
-                    names_glue="{.value}_{payor}",
-                    values_fill=0) %>%
-                  mutate(index_cluster=1:nrow(.)) %>%
-                  arrange(runif(nrow(.)));
+# charges_wide <- charges_long %>%
+#                   select(-facility_name, -cpt_hcpcs) %>%
+#                   pivot_wider(names_from = "payor",
+#                     values_from = "charge",
+#                     names_glue="{.value}_{payor}",
+#                     values_fill=0) %>%
+#                   mutate(index_cluster=1:nrow(.)) %>%
+#                   arrange(runif(nrow(.)));
 
 # charge_cat_wide <- charges_wide %>%
 #     inner_join(betos_hcpcs, by = c("code" = "hcpc"), keep = TRUE) %>%
@@ -156,10 +223,10 @@ charges_wide <- charges_long %>%
 ```
 
 ```{r EXPERIMENT}
-test <- charges_long %>%
-  inner_join(crosswalk, by = c("cpt_hcpcs" = "code"), keep = TRUE) %>%
-  select(charge_description, code.x, price, min, max, payor, charge, description) %>%
-  mutate(is.medicare = map_lgl(payor, ~any(str_detect(., "medicare"))))
+# test <- charges_long %>%
+#   inner_join(crosswalk, by = c("cpt_hcpcs" = "code"), keep = TRUE) %>%
+#   select(charge_description, code.x, price, min, max, payor, charge, description) %>%
+#   mutate(is.medicare = map_lgl(payor, ~any(str_detect(., "medicare"))))
 
 # test_wide <- test %>%
 #   pivot_wider(names_from = "payor",
@@ -177,14 +244,14 @@ test <- charges_long %>%
 
 ```
 
-```{r}
+```{r plots}
 
 ggplot(test) +
   geom_bar(mapping = aes(x = fct_infreq(as.factor(description)))) +
   coord_flip() +
   labs(subtitle = "Quick Visualization")
 
-ggplot(test) +
+ggplot(charges_clean) +
   geom_bar(mapping = aes(x = is.medicare)) +
   coord_flip() +
   labs(subtitle = "Quick Visualization")
@@ -341,23 +408,32 @@ ggplot(p, aes(x=payor, y=charge)) +
 
 
 # Plot  -------------------------------
+```{r medicare}
+ggplot(charges_clean) +
+  geom_bar(mapping = aes(x = is.medicare)) +
+  coord_flip() +
+  labs(subtitle = "Quick Visualization")
+```
+
+
+
 
 
 # Features  -------------------------------
 
 ```{r}
  # Scratch with 'test' data
-test2 <- charge_cat_leftjoin %>%
-  filter(charge > 0) %>%
-  mutate(rng = max - min) %>%
-  mutate(price_diff = charge - price)
-
-
-print(sprintf("Before simplification and deduplication: %d, after %d (%0.2f %% decrease)",
-              nrow(test),
-              nrow(test2),
-              100-100*nrow(test2)/nrow(test)));
-         
+# test2 <- charge_cat_leftjoin %>%
+#   filter(charge > 0) %>%
+#   mutate(rng = max - min) %>%
+#   mutate(price_diff = charge - price)
+# 
+# 
+# print(sprintf("Before simplification and deduplication: %d, after %d (%0.2f %% decrease)",
+#               nrow(test),
+#               nrow(test2),
+#               100-100*nrow(test2)/nrow(test)));
+#          
 
 ```
 
@@ -393,4 +469,23 @@ print(sprintf("Before simplification and deduplication: %d, after %d (%0.2f %% d
 #   labs(y = NULL)
 ```
 
+
+# Utils --------------------------------------
+```{r utils}
+
+
+
+chars_to_factors <- function(df){
+    for(n in names(df)){
+        if(typeof(df[[n]]) == typeof('')){
+            df[[n]] <- factor(df[[n]]);
+        }
+    }
+    df;
+}
+```
+
+```{r}
+
+```
 
