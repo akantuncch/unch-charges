@@ -14,6 +14,8 @@ library(ggrepel)
 library(haven)
 library(DataExplorer)
 library(matlab)
+library(quanteda)
+library(tidytext)
 ```
 
 # Load data ----------------------------- 
@@ -282,3 +284,36 @@ ggplot(p, aes(x=payor, y=charge)) +
 
 
 # Plot  -------------------------------
+
+
+# Text analysis ---------------------------
+
+```{r}
+# charges_txt2 <- charges %>%
+#   mutate(index_cluster=1:nrow(.)) %>%
+#   arrange(runif(nrow(.))) %>%
+#   mutate(cleaned = str_remove(charge_description, "[a-zA-Z]+\s"))
+
+
+# mycorp <- corpus(charges_txt$charge_description)
+# 
+# mytokens <- tokens(mycorp, remove_punct = TRUE, remove_numbers = TRUE)
+
+# 
+# texts(txt_charges)
+# 
+# txt_charges_quant <- corpus(charges)
+
+
+# tokens(txt_charges)
+
+# txt_charges %>%
+#   count(word, sort = TRUE) %>%
+#   filter(n > 150) %>%
+#   mutate(word = reorder(word, n)) %>%
+#   ggplot(aes(n, word)) +
+#   geom_col() +
+#   labs(y = NULL)
+```
+
+
