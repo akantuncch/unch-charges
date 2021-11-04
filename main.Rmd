@@ -35,28 +35,69 @@ hcpcs <- readxl::read_xlsx("~/unch-charges/data/HCPCS/HCPC2021_OCT_ANWEB.xlsx")
 ```
 # Preprocess ---------------------------
 
-```{r}
-# Clean DRG characters from col
-charges <- charges %>% 
-  mutate(code = str_remove(cpt_hcpcs, "MS-DRG: "))
+```{r preprocess}
 
-charges_long <- charges %>%
-  # Wrangle payor columns to key:value pair
+# Remove unnecessary strings and pivot long
+charges_clean <- charges %>%
+  select(!facility_name) %>%
+  mutate(code = str_remove(cpt_hcpcs, "MS-DRG: "), .keep = "unused") %>%
+  mutate(clean_description = str_remove(charge_description, "HC "),
+         .keep = "unused") %>%
   pivot_longer(
     cols = aetna:united_healthcare_medicare_advantage,
     names_to = "payor",
     values_to = "charge",
-    )
+  ) %>%
+  mutate(is.medicare = map_lgl(payor, ~ any(str_detect(., "medicare")) | (str_detect(., "humana_alignment")))) %>% # Note to lookup each for medicare
+  mutate(across(payor, as_factor)) %>%
+  mutate(code = replace_na(code, "NO CODE")) %>%
+  mutate(index_clean = 1:nrow(.)) %>%
+  arrange(runif(nrow(.)))
 
 
 # Remove $ and , from string, convert to numeric
-charges_long$price = as.double(gsub("[\\$,]", "", charges_long$price))
-charges_long$min = as.double(gsub("[\\$,]", "", charges_long$min))
-charges_long$max = as.double(gsub("[\\$,]", "", charges_long$max))
-charges_long$charge = as.double(gsub("[\\$,]", "", charges_long$charge))
+charges_clean$price = as.double(gsub("[\\$,]", "", charges_clean$price))
+charges_clean$min = as.double(gsub("[\\$,]", "", charges_clean$min))
+charges_clean$max = as.double(gsub("[\\$,]", "", charges_clean$max))
+charges_clean$charge = as.double(gsub("[\\$,]", "", charges_clean$charge))  
+
+# regex for HC /^(?:HC )\b
+
+unique_payor <- distinct(charges_clean, payor)
 
 
 ```
+
+```{r feat}
+# Add features for range and price/charge difference
+charges_clean_ft <- charges_clean %>%
+  filter(charge >= 1) %>%
+  mutate(rng = max - min) %>%
+  mutate(price_diff = charge - price)
+
+# Output data changes
+print(sprintf("Before simplification and deduplication: %d, after %d (%0.2f %% decrease)",
+              nrow(charges_clean),
+              nrow(charges_clean_ft),
+              100-100*nrow(charges_clean_ft)/nrow(charges_clean)));
+
+# Recode NA codes
+# charges_clean_ft2 <- charges_clean_ft %>%
+#   mutate(code = replace_na(code, "NO CODE")) 
+
+```
+```{r charge-catagories}
+category <- charges_clean %>%
+  inner_join(crosswalk, by = c("code" = "code"), keep = TRUE) %>%
+  select(index_clean, clean_description, description)
+
+print(sprintf("Before inner join: %d, after %d (%0.2f %% decrease)",
+              nrow(charges_clean),
+              nrow(category),
+              100-100*nrow(category)/nrow(charges_clean)));
+
+```
+
 
 
 ```{r crossref-catagories}
@@ -69,19 +110,28 @@ betos_hcpcs <- clean_names(betos_hcpcs)
 #   group_by(domain_meaning_name) %>%
 #   distinct
 
-
-
-charge_cat <- charges_long %>%
+betos_cat <- charges_clean %>%
   inner_join(betos_hcpcs, by = c("code" = "hcpc"), keep = TRUE) %>%
-  select(charge_description, code, price, min, max, payor, charge, domain_meaning_name, long_description)
+  select(clean_description, code, price, min, max, payor, charge, domain_meaning_name, long_description)
 
-charge_cat_leftjoin <- charges_long %>%
-  left_join(betos_hcpcs, by = c("code" = "hcpc"), keep = TRUE) %>%
-  select(charge_description, code, price, min, max, payor, charge, domain_meaning_name, long_description) %>%
-  mutate(is.medicare = map_lgl(payor, ~any(str_detect(., "medicare"))))
+print(sprintf("Before simplification and join: %d, after %d (%0.2f %% decrease)",
+              nrow(betos_hcpcs),
+              nrow(charges_clean),
+              100-100*nrow(charges_clean)/nrow(betos_hcpcs)));
 
-# All charges as 0 to 1 for matrices
-charge_cat[charge_cat == 0] <- 1
+
+
+# charge_cat <- charges_long %>%
+#   inner_join(betos_hcpcs, by = c("code" = "hcpc"), keep = TRUE) %>%
+#   select(charge_description, code, price, min, max, payor, charge, domain_meaning_name, long_description)
+# 
+# charge_cat_leftjoin <- charges_long %>%
+#   left_join(betos_hcpcs, by = c("code" = "hcpc"), keep = TRUE) %>%
+#   select(charge_description, code, price, min, max, payor, charge, domain_meaning_name, long_description) %>%
+#   mutate(is.medicare = map_lgl(payor, ~any(str_detect(., "medicare"))))
+# 
+# # All charges as 0 to 1 for matrices
+# charge_cat[charge_cat == 0] <- 1
 
 # Convert back to wide data
 charges_wide <- charges_long %>%
@@ -93,15 +143,15 @@ charges_wide <- charges_long %>%
                   mutate(index_cluster=1:nrow(.)) %>%
                   arrange(runif(nrow(.)));
 
-charge_cat_wide <- charges_wide %>%
-    inner_join(betos_hcpcs, by = c("code" = "hcpc"), keep = TRUE) %>%
-    select(starts_with("charge_"), code, price, min, max, index_cluster, domain_meaning_name, long_description)
-
-charge_cat_wide_qualitycheck <- charges_wide %>%
-    left_join(betos_hcpcs, by = c("code" = "hcpc"), keep = TRUE) %>%
-    select(starts_with("charge_"), code, price, min, max, index_cluster, permissible_value, domain_meaning_name, long_description)
-
-charge_cat_wide[charge_cat_wide == 0] <- 1
+# charge_cat_wide <- charges_wide %>%
+#     inner_join(betos_hcpcs, by = c("code" = "hcpc"), keep = TRUE) %>%
+#     select(starts_with("charge_"), code, price, min, max, index_cluster, domain_meaning_name, long_description)
+# 
+# charge_cat_wide_qualitycheck <- charges_wide %>%
+#     left_join(betos_hcpcs, by = c("code" = "hcpc"), keep = TRUE) %>%
+#     select(starts_with("charge_"), code, price, min, max, index_cluster, permissible_value, domain_meaning_name, long_description)
+# 
+# charge_cat_wide[charge_cat_wide == 0] <- 1
   
 ```
 
@@ -268,6 +318,8 @@ charges_wide_matrix <- charges_wide %>%
 ```{r}
 heatmap(charges_wide_matrix, xlab="Payor", ylab="Charge Code", main="heatmap")
 ```
+
+
 ```{r}
 p <- charges_long %>%
   select(payor, charge, price, code) %>%
