@@ -75,6 +75,11 @@ charge_cat <- charges_long %>%
   inner_join(betos_hcpcs, by = c("code" = "hcpc"), keep = TRUE) %>%
   select(charge_description, code, price, min, max, payor, charge, domain_meaning_name, long_description)
 
+charge_cat_leftjoin <- charges_long %>%
+  left_join(betos_hcpcs, by = c("code" = "hcpc"), keep = TRUE) %>%
+  select(charge_description, code, price, min, max, payor, charge, domain_meaning_name, long_description) %>%
+  mutate(is.medicare = map_lgl(payor, ~any(str_detect(., "medicare"))))
+
 # All charges as 0 to 1 for matrices
 charge_cat[charge_cat == 0] <- 1
 
@@ -106,19 +111,19 @@ test <- charges_long %>%
   select(charge_description, code.x, price, min, max, payor, charge, description) %>%
   mutate(is.medicare = map_lgl(payor, ~any(str_detect(., "medicare"))))
 
-test_wide <- test %>%
-  pivot_wider(names_from = "payor",
-              values_from = "charge",
-              names_glue="{.value}_{payor}",
-              values_fill=0) %>%
-  mutate(index_cluster=1:nrow(.)) %>%
-  arrange(runif(nrow(.))) %>%
-  select(!is_medicare)
+# test_wide <- test %>%
+#   pivot_wider(names_from = "payor",
+#               values_from = "charge",
+#               names_glue="{.value}_{payor}",
+#               values_fill=0) %>%
+#   mutate(index_cluster=1:nrow(.)) %>%
+#   arrange(runif(nrow(.))) %>%
+#   select(!is_medicare)
 
 # Changes is_medicare to TRUE
-test[test == 0] <- 1
-
-test_wide[test_wide == 0] <- 1
+# test[test == 0] <- 1
+# 
+# test_wide[test_wide == 0] <- 1
 
 ```
 
@@ -284,6 +289,26 @@ ggplot(p, aes(x=payor, y=charge)) +
 
 
 # Plot  -------------------------------
+
+
+# Features  -------------------------------
+
+```{r}
+ # Scratch with 'test' data
+test2 <- charge_cat_leftjoin %>%
+  filter(charge > 0) %>%
+  mutate(rng = max - min) %>%
+  mutate(price_diff = charge - price)
+
+
+print(sprintf("Before simplification and deduplication: %d, after %d (%0.2f %% decrease)",
+              nrow(test),
+              nrow(test2),
+              100-100*nrow(test2)/nrow(test)));
+         
+
+```
+
 
 
 # Text analysis ---------------------------
