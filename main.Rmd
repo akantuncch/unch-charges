@@ -16,11 +16,13 @@ library(DataExplorer)
 library(matlab)
 library(quanteda)
 library(tidytext)
+library(tidymodels)
+
 ```
 
 # Load data ----------------------------- 
 
-```{r warning=FALSE}
+```{r echo=FALSE, warning=FALSE, message=FALSE}
 # Import data sources
 charges <- read_csv("data/561118388_uncmedicalcenter_cdmstandardcharges.csv",
                 name_repair = make_clean_names)
@@ -33,6 +35,17 @@ crosswalk <- read_csv("~/unch-charges/data/nc_crosswalk.csv",
 
 hcpcs <- readxl::read_xlsx("~/unch-charges/data/HCPCS/HCPC2021_OCT_ANWEB.xlsx")
 ```
+
+
+# Questions ---------------------------
+
+1. What healthcare services vary most among payors? Do these have anything in common?
+2. Most expensive services? Inexpensive?
+3. How does Blue Cross Blue Shield compare to other commercial plans?
+4. How do Medicare plans compare to others?
+5. How does coverage vary across payors (proportion > $0.00)?
+6. Which hospital room settings are most, least expensive?
+
 # Preprocess ---------------------------
 
 ```{r preprocess}
@@ -69,6 +82,73 @@ payor_list <- charges_clean$payor %>% unique() %>% tibble() %>% arrange(desc(.))
 ```
 
 
+
+
+
+
+```{r charge-variance}
+charge_var <- charges_clean %>%
+  select(payor, charge, code, clean_description, index_id) %>%
+  group_by(code, clean_description, index_id) %>%
+  summarise(max(charge), sd(charge), median(charge), mad(charge)) 
+
+  # select(payor, charge, code) %>%
+  # group_by(code) %>%
+  # summarise(max_pay = max(charge),
+  #           min_pay = min(charge)) 
+
+# payor_var <- charges_wide %>%
+#   rowwise() %>%
+#   mutate(zscore = qnorm(
+#     c_across(liberty_medicare_advantage:bcbs_unc_health_alliance)
+#   )) %>%
+#   ungroup() %>%
+#   arrange(desc(zscore))
+
+
+# payor_var <- charges_wide %>%
+#   rowwise() %>%
+#   mutate(zscore = (
+#     avg = c_across(liberty_medicare_advantage:bcbs_unc_health_alliance) %>% mean()
+#   ) / ((
+#     dev = c_across(liberty_medicare_advantage:bcbs_unc_health_alliance) %>% sd()
+#   ))) %>%
+#     ungroup() %>%
+#     arrange(desc(zscore))
+
+# payor_var$'type' <- rownames(payor_var)
+# 
+# payor_var$type <-
+#   ifelse(payor_var$zscore < 0, "below", "above")  # above / below avg flag
+# 
+# payor_var <- payor_var[order(payor_var$zscore),]  # sort
+# 
+# mtcars$`car name` <-
+#   factor(mtcars$`car name`, levels = mtcars$`car name`)  # convert to factor to retain sorted order in plot.
+# 
+# ggplot(payor_var, aes(x=`car name`, y=mpg_z, label=mpg_z)) + 
+#     # change default bar thickness from 1 to 0.5
+#     # geom_bar() with stat=identity is geom_col
+#     geom_col(aes(fill=mpg_type), width=.5)  +
+#     #display mpg_z value for each bar in black
+#     geom_text(color="black", size=3)+
+#     scale_fill_manual(name="Mileage", 
+#                     labels = c("Above Average", "Below Average"), 
+#                     values = c("above"="green", "below"="tomato")) + 
+#     labs(subtitle="Normalised mileage from 'mtcars'", 
+#        title= "Diverging Bars") + 
+#     #flip co-ordinate to show car names clearly/horizontally
+#     coord_flip()
+
+
+
+# payor_var <- charges_wide %>%
+#   #select(-index_id,-code,-price,-min,-max,-clean_description) %>%
+#   rowwise() %>%
+#   mutate(variance = c_across(liberty_medicare_advantage:bcbs_unc_health_alliance) %>% var()) %>%
+#   ungroup() %>%
+#   arrange(desc(variance))
+```
 
 
 
@@ -124,7 +204,15 @@ room_charge <- charges_wide %>%
 ggplot(room_charge, aes(reorder(clean_description, price), price)) +
   geom_col(aes()) +
   coord_flip() +
-  labs(subtitle = "Hospital Room Cost by Type")
+  labs(subtitle = "Hospital Room Cost by Type") +
+  theme(
+    panel.border = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.line = element_line(colour = "black")
+  )
+# alternative (after loading ggridges library)
+# theme_ridges(grid = F, center_axis_labels = T)
 
 ```
 
@@ -136,10 +224,7 @@ most_var <- charges_clean %>%
   mutate(price_diff = charge - price)
 
 most_var_h <- most_var %>%
-  slice_max(price_diff, n = 10)
-
-
-
+  slice_max(price_diff, n = 20)
 
 # Output data changes
 # print(sprintf("Before simplification and deduplication: %d, after %d (%0.2f %% decrease)",
@@ -156,8 +241,8 @@ most_var_h <- most_var %>%
 
 ```{r charge-catagories}
 category <- charges_clean %>%
-  inner_join(crosswalk, by = c("code" = "code"), keep = TRUE) %>%
-  select(index_clean, clean_description, description)
+  left_join(crosswalk, by = c("code" = "code"), keep = TRUE) %>%
+  select(index_long, clean_description, description, index_id)
 
 print(sprintf("Before inner join: %d, after %d (%0.2f %% decrease)",
               nrow(charges_clean),
@@ -295,7 +380,7 @@ summary(lm1)
 
 ```{r pca}
 charges_matrix <- charges_wide %>%
-  select(-charge_description, -code) %>%
+  select(-clean_description, -code, -index_id, -price, -min, -max) %>%
   as.matrix();
 
 library(missMDA)
@@ -368,7 +453,7 @@ ggplot(charges_long, aes(x = charge, y = payor)) +
 ```
 
 ```{r}
-summary(charges_long)
+summary(charges_clean)
 summary(charges_wide)
 ```
 
@@ -376,7 +461,7 @@ summary(charges_wide)
 ```{r}
 charges_wide_matrix <- charges_wide %>%
   select_if(is.numeric) %>%
-  select(!index_cluster) %>%
+  select(!index_id) %>%
   arrange(desc(price), .by_group = TRUE) %>%
   as.matrix()
 ```
@@ -388,13 +473,16 @@ heatmap(charges_wide_matrix, xlab="Payor", ylab="Charge Code", main="heatmap")
 
 
 ```{r}
-p <- charges_long %>%
+p <- charges_clean %>%
   select(payor, charge, price, code) %>%
   filter(payor == "bcbs" | payor == "bcbs_medicare_advantage" | payor == "bcbs_unc_health_alliance" | payor == "blue_home") %>%
   mutate(across(payor, as_factor))
 
 ggplot(p, aes(x=price, y=charge, color=payor)) + 
   geom_point()
+
+ggplot(p, aes(charge)) + 
+  geom_histogram(boundary = 0, bins = 20)
 ```
 
 ```{r lollipop }
@@ -442,31 +530,71 @@ ggplot(charges_clean) +
 # Text analysis ---------------------------
 
 ```{r}
-# charges_txt2 <- charges %>%
-#   mutate(index_cluster=1:nrow(.)) %>%
-#   arrange(runif(nrow(.))) %>%
-#   mutate(cleaned = str_remove(charge_description, "[a-zA-Z]+\s"))
+text <- charges_wide %>%
+  unnest_tokens(word, clean_description)
 
+print(sprintf("Before tokenizing: %d, after %d (%0.2f %% decrease)",
+               nrow(charges_wide),
+               nrow(text),
+               100-100*nrow(text)/nrow(charges_wide)));
 
-# mycorp <- corpus(charges_txt$charge_description)
+data(stop_words)
+
+text2 <- text %>%
+  anti_join(stop_words)
+
+print(sprintf("Before removing stop words: %d, after %d (%0.2f %% decrease)",
+               nrow(text),
+               nrow(text2),
+               100-100*nrow(text2)/nrow(text)));
+
+nums <- text2 %>% filter(str_detect(word, "^[0-9]")) %>% select(word) %>% unique()
+
+text2 <- text2 %>% 
+  anti_join(nums, by = "word")
+
+text2 %>%
+  count(word, sort = TRUE) %>%
+  filter(n > 50) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(n, word)) +
+  geom_col() +
+  labs(y = "Words from Charge Descriptions")
+
+# text_bigrams <- charges_wide %>%
+#   unnest_tokens(bigram, clean_description, token = "ngrams", n = 2)
 # 
-# mytokens <- tokens(mycorp, remove_punct = TRUE, remove_numbers = TRUE)
-
+# bigrams_separated <- text_bigrams %>%
+#   separate(bigram, c("word1", "word2"), sep = " ")
 # 
-# texts(txt_charges)
+# bigrams_filtered <- bigrams_separated %>%
+#   filter(!word1 %in% stop_words$word) %>%
+#   filter(!word2 %in% stop_words$word)
 # 
-# txt_charges_quant <- corpus(charges)
+# bigram_counts <- bigrams_filtered %>% 
+#   count(word1, word2, sort = TRUE)
+# 
+# bigrams_united <- bigrams_filtered %>%
+#   unite(bigram, word1, word2, sep = " ")
+# 
+# 
+# AFINN <- get_sentiments("afinn")
+# 
+# not_words <- bigrams_separated %>%
+#   filter(word1 == "not") %>%
+#   inner_join(AFINN, by = c(word2 = "word")) %>%
+#   count(word2, value, sort = TRUE)
+# 
+# not_words %>%
+#   mutate(contribution = n * value) %>%
+#   arrange(desc(abs(contribution))) %>%
+#   head(20) %>%
+#   mutate(word2 = reorder(word2, contribution)) %>%
+#   ggplot(aes(n * value, word2, fill = n * value > 0)) +
+#   geom_col(show.legend = FALSE) +
+#   labs(x = "Sentiment value * number of occurrences",
+#        y = "Words preceded by \"not\"")
 
-
-# tokens(txt_charges)
-
-# txt_charges %>%
-#   count(word, sort = TRUE) %>%
-#   filter(n > 150) %>%
-#   mutate(word = reorder(word, n)) %>%
-#   ggplot(aes(n, word)) +
-#   geom_col() +
-#   labs(y = NULL)
 ```
 
 
