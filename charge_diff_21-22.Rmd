@@ -1,0 +1,87 @@
+```{r setup, echo=FALSE}
+library(tidyverse)
+library(janitor)
+library(hrbrthemes)
+# library(ggridges)
+# library(ggrepel)
+# library(haven)
+# library(DataExplorer)
+# library(matlab)
+
+charges_21 <- read_csv("data/561118388_uncmedicalcenter_cdmstandardcharges.csv",
+                    #clean column names
+                    name_repair = make_clean_names)
+
+charges_22 <- read_csv("data/561118388_uncmedicalcenter_standardcharges_22.csv",
+                    #clean column names
+                    name_repair = make_clean_names)
+
+
+```
+
+```{r convert-numeric}
+charges_long_21 <- charges_21 %>%
+  # Wrangle payor columns to key:value pair
+  pivot_longer(
+    cols = aetna:united_healthcare_medicare_advantage,
+    names_to = "payor",
+    values_to = "charge_payor",
+    )
+
+charges_long_22 <- charges_22 %>%
+  # Wrangle payor columns to key:value pair
+  pivot_longer(
+    cols = discounted_cash_price:well_care_medicare_advantage,
+    names_to = "payor",
+    values_to = "charge_payor",
+    )
+
+charges_long_21$price = as.integer(gsub("[\\$,]", "", charges_long_21$price))
+charges_long_21$min = as.integer(gsub("[\\$,]", "", charges_long_21$min))
+charges_long_21$max = as.integer(gsub("[\\$,]", "", charges_long_21$max))
+charges_long_21$charge_payor = as.integer(gsub("[\\$,]", "", charges_long_21$charge_payor))
+
+charges_long_22$charge = as.integer(gsub("[\\$,]", "", charges_long_22$charge))
+charges_long_22$de_identified_minimum_negotiated_charge = as.integer(gsub("[\\$,]", "", charges_long_22$de_identified_minimum_negotiated_charge))
+charges_long_22$de_identified_maximum_negotiated_charge = as.integer(gsub("[\\$,]", "", charges_long_22$de_identified_maximum_negotiated_charge))
+charges_long_22$charge_payor = as.integer(gsub("[\\$,]", "", charges_long_22$charge_payor))
+
+
+charges_num_21 <- charges_long_21 %>%
+                  select(-facility_name) %>%
+                  pivot_wider(names_from = "payor",
+                    values_from = "charge_payor",
+                    names_glue="{.value}_{payor}",
+                    values_fill=0) %>%
+                  mutate(index_cluster=1:nrow(.)) %>%
+                  arrange(runif(nrow(.)));
+
+charges_num_22 <- charges_long_22 %>%
+                  select(-facility_name) %>%
+                  pivot_wider(names_from = "payor",
+                    values_from = "charge_payor",
+                    names_glue="{.value}_{payor}",
+                    values_fill=0) %>%
+                  mutate(index_cluster=1:nrow(.)) %>%
+                  arrange(runif(nrow(.)));
+
+charges_num_22 <- charges_long_22 %>%
+                  select(-facility_name) %>%
+                  mutate(index_cluster = row_number()) %>%
+                  pivot_wider(names_from = "payor",
+                    values_from = "charge_payor")
+
+rm(charges_21)
+rm(charges_22)
+rm(charges_long_21)
+rm(charges_long_22)
+
+
+
+```
+
+```{r}
+
+```
+ 
+ 
