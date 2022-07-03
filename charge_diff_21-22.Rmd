@@ -3,7 +3,7 @@ library(tidyverse)
 library(janitor)
 library(hrbrthemes)
 # library(ggridges)
-# library(ggrepel)
+library(ggrepel)
 # library(haven)
 library(DataExplorer)
 library(stringi)
@@ -96,44 +96,26 @@ compare <- simple_21 %>%
 df_compare <- simple_22 %>%
   left_join(simple_21, by = "charge_description", na_matches = "never", keep = T, suffix = c(".22",".21"))
 
-plot_missing(compare)
+# Clean up
+rm(simple_21, simple_22)
 
-# Remove 'HC ' string from all descriptions
-df_compare <- modify(df_compare, ~str_remove_all(.,"HC "))
+plot_missing(compare)
+plot_missing(df_compare)
+
+# Remove 'HC ' string from descriptions
+df_compare <- modify_at(df_compare, c(1, 6),  ~str_remove_all(.,"HC "))
 
 df_diff <- df_compare %>%
-  mutate(charge.22 = parse_number(as.character(charge.22))) %>%
-  mutate(minimum.22 = parse_number(as.character(minimum.22))) %>%
-  mutate(maximum.22 = parse_number(as.character(minimum.22))) %>%
-      mutate(charge.21 = parse_number(as.character(charge.21))) %>%
-      mutate(minimum.21 = parse_number(as.character(minimum.21))) %>%
-      mutate(maximum.21 = parse_number(as.character(maximum.21))) %>%
-    group_by(charge_description.22) %>%
-      distinct() %>%
-      drop_na() %>%
-      mutate(pct_change = ((
-        charge.22 - charge.21
-      ) / charge.21) * 100) %>%
-      mutate(abs_change = charge.22 - charge.21) %>%
-      select(
-        charge_description.22,
-        code = cpt_hcpcs.22,
-        pct_change,
-        abs_change,
-        charge.22,
-        charge.21
-      ) %>%
-      arrange(desc(pct_change))
-
-
-# print(sprintf("There is a  %d percent difference between charges before join, after %d (%0.2f %% decrease)",
-#             (nrow(simple_22)/nrow(simple_21) - 1) *100,
-#               nrow(simple_21),
-#               nrow(compare),
-#               100-100*nrow(compare)/nrow(simple_21)));
-# 
-# pct_change = ((Profit/lag(Profit) - 1) * 100))
-
+  drop_na() %>%
+  mutate(pct_change = ((charge.22 - charge.21) / charge.21) * 100) %>%
+  mutate(abs_change = charge.22 - charge.21) %>%
+  select(description = charge_description.22,
+         code = cpt_hcpcs.22,
+         pct_change,
+         abs_change,
+         charge.22,
+         charge.21) %>%
+  distinct()
 ```
 
 
@@ -161,30 +143,57 @@ library(dplyr)
   
 # x <- seq(0, 2*pi, length.out=1000)
 
-# plot
-df_plot <- df_diff %>% 
-  mutate(mycolor = ifelse(pct_change>0, "type1", "type2")) %>%
-  tibble::rownames_to_column(var = "x") %>%
-  arrange(desc(x)) %>%
-    ggplot(aes(x = x, y = pct_change)) +
-    geom_segment(
-      aes(
-        x = x,
-        xend = x,
-        y = 0,
-        yend = pct_change,
-        color = mycolor
-      ),
-      size = 1.3,
-      alpha = 0.9
-    ) +
-    theme_light() +
-    theme(legend.position = "none",
-          panel.border = element_blank(),) +
-    xlab("") +
-    ylab("Value of Y")
+# df_plot <- df_slice %>% 
+#   mutate(mycolor = ifelse(pct_change>0, "type1", "type2")) %>%
+#   tibble::rownames_to_column(var = "x") %>%
+#   arrange(x, desc(-pct_change))
 
-df_plot
+
+# plot
+df_slice <- bind_rows(
+  df_diff %>% slice_min(pct_change, n=10, with_ties = FALSE),
+  df_diff %>% slice_max(pct_change, n=10, with_ties = FALSE)
+)
+
+df_plot <- df_slice %>% 
+  mutate(mycolor = ifelse(pct_change>0, "type1", "type2")) %>%
+  tibble::rownames_to_column(var = "index") %>%
+  arrange(pct_change) %>%
+  mutate(description=factor(description, description))
+
+# %>%
+#   arrange(desc(pct_change))
+
+# df_plot <- transform(df_plot, x = fct_shuffle(df_plot$x))
+
+ggplot(data = df_plot, aes(description, pct_change)) +
+  geom_segment(
+    aes(
+      x = description,
+      xend = description,
+      y = 0,
+      yend = pct_change,
+      color = mycolor
+    ),
+    size = 4,
+    alpha = 0.9
+  ) +
+  theme_light() +
+  theme(
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    legend.position = "none",
+    panel.border = element_blank()
+  ) +
+  xlab("") +
+  ylab("Percent Change 22-21") +
+  coord_flip()
+
+
+
+# df_plot
 ```
 
 
@@ -288,6 +297,43 @@ rm(charges_long_22)
 ```
 
 ```{r}
+# OBSELETE WRANGLING
+df_diff <- df_compare %>%
+  mutate(charge.22 = parse_number(as.character(charge.22))) %>%
+  mutate(minimum.22 = parse_number(as.character(minimum.22))) %>%
+  mutate(maximum.22 = parse_number(as.character(minimum.22))) %>%
+      mutate(charge.21 = parse_number(as.character(charge.21))) %>%
+      mutate(minimum.21 = parse_number(as.character(minimum.21))) %>%
+      mutate(maximum.21 = parse_number(as.character(maximum.21))) %>%
+      distinct() %>%
+      drop_na() %>%
+      mutate(pct_change = ((
+        charge.22 - charge.21
+      ) / charge.21) * 100) %>%
+      mutate(abs_change = charge.22 - charge.21) %>%
+      select(
+        charge_description.22,
+        code = cpt_hcpcs.22,
+        pct_change,
+        abs_change,
+        charge.22,
+        charge.21
+      )
+
+
+
+# print(sprintf("There is a  %d percent difference between charges before join, after %d (%0.2f %% decrease)",
+#             (nrow(simple_22)/nrow(simple_21) - 1) *100,
+#               nrow(simple_21),
+#               nrow(compare),
+#               100-100*nrow(compare)/nrow(simple_21)));
+# 
+# pct_change = ((Profit/lag(Profit) - 1) * 100))
+
+
+# Remove 'HC ' string from all descriptions OBSELETE, MODIFY REMOVES ATTR
+df_compare2 <- modify(df_compare, ~str_remove_all(.,"HC "))
+
 simple_21[, col_list] <-
   lapply(simple_21[, col_list], function(x)
     x <- car::recode(x, "charge"=as.numeric(); "min"=as.numeric(); "max"=as.numeric())
