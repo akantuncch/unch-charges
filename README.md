@@ -57,10 +57,6 @@ The dataset was accessed on Aug 24, 2021 and exported as a .csv file. It include
 * 36 payors, including Blue Cross Blue Shield North Carolina (Note: one price per ‘charge bundle’)
 * Cross-referenced medical codes; Medicare Severity-Diagnosis Related Group (MS-DRG) / Current Procedural Terminology (CPT) / Healthcare Common Procedure Coding System (HCPCS), as available
 
-## Conclusion
-
-I’m excited to explore this dataset, and in particular, put into practice knowledge gained from this course. My goals for this project are carefully tempered by the complexity of healthcare, healthcare insurance, reimbursement, data gaps and other challenges – still, I believe I will gain better understanding at the end of the semester. One specific and achievable goal is to design and share an interactive dashboard via Shiny (or other tool) that can be used by others to discover their own insights. As the dataset is updated and/or expanded, I would like to use it as a tool for me and my team to make better decisions about technologies under development at UNC.
-
 ## References
 
 CMS. (2019, November 27). Hospital Price Transparency Rule. Retrieved August 30, 2021, from <https://www.cms.gov/hospital-price-transparency>
