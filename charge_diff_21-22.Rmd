@@ -7,7 +7,8 @@ library(ggrepel)
 # library(haven)
 library(DataExplorer)
 library(stringi)
-# library(matlab)
+library(viridis)
+library(ggrepel)
 
 # charges_21 <- read_csv("data/561118388_uncmedicalcenter_cdmstandardcharges.csv",
 #                     #clean column names
@@ -166,7 +167,37 @@ df_plot <- df_slice %>%
 
 # df_plot <- transform(df_plot, x = fct_shuffle(df_plot$x))
 
+
+
+
+
+# df_plot
+```
+
+
+```{r final-plot, warning=FALSE, message=F}
+
 ggplot(data = df_plot, aes(description, pct_change)) +
+    geom_hline(
+    yintercept = 100,
+    colour = "red",
+    size = 0.7,
+    alpha = 0.35, 
+    linetype = "dashed"
+  ) +
+    geom_hline(
+    yintercept = 200,
+    colour = "red",
+    size = 0.7,
+    alpha = 0.35, 
+    linetype = "dashed"
+  ) +
+  geom_hline(
+    yintercept = 0,
+    colour = "darkgrey",
+    size = 0.7,
+    alpha = 1
+  ) +
   geom_segment(
     aes(
       x = description,
@@ -175,28 +206,50 @@ ggplot(data = df_plot, aes(description, pct_change)) +
       yend = pct_change,
       color = mycolor
     ),
-    size = 4,
-    alpha = 0.9
+    size = 9,
+    alpha = 1,
   ) +
-  theme_light() +
+  scale_y_continuous(labels = scales::percent_format(scale = 1), expand = expansion(mult = c(.05, NA))) +
+  geom_label(
+    aes(label = description),
+    alpha = 0,
+    hjust = "inward",
+    # position = position_stack(vjust = 0),
+    size = 4.5,
+    label.size = 0,
+    label.padding = unit(0.2, "lines")) +
+  geom_text(
+    aes(label = scales::dollar(charge.22)),
+    hjust = "outward"
+  ) +
+  theme_ipsum_rc() +
+  labs(
+    title = "Top/Bottom 10 Pricing Changes for Healthcare Services",
+    subtitle = "UNC Medical Center | July 2022",
+    x = "",
+    y = "Relative Percent Change 2022-2021 (%) | Listed Cost 2022 ($)",
+    caption = "Source | UNC Health"
+  ) +
   theme(
+    plot.margin = margin(15, 40, 8, 8),
     panel.grid.minor.y = element_blank(),
     panel.grid.major.y = element_blank(),
     panel.grid.major.x = element_blank(),
     panel.grid.minor.x = element_blank(),
+    axis.title.x = element_text(hjust=0, vjust = -0.2),
+    axis.ticks.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
     legend.position = "none",
-    panel.border = element_blank()
-  ) +
-  xlab("") +
-  ylab("Percent Change 22-21") +
-  coord_flip()
+    panel.border = element_blank()) +
+  coord_flip(clip = "off") +
+  guides(fill = guide_legend(override.aes = list(alpha = 1))
+  )
 
+# ggsave("images/charge-movers22.png", bg = "white")
+ggsave("images/charge-movers22.png", bg = "white", width = 10, height = 10, units = "in", dpi = 300)
 
-
-# df_plot
 ```
-
-
 
 
 
@@ -337,6 +390,76 @@ df_compare2 <- modify(df_compare, ~str_remove_all(.,"HC "))
 simple_21[, col_list] <-
   lapply(simple_21[, col_list], function(x)
     x <- car::recode(x, "charge"=as.numeric(); "min"=as.numeric(); "max"=as.numeric())
+```
+ 
+```{r backup-plot}
+
+ggplot(data = df_plot, aes(description, pct_change)) +
+  geom_segment(
+    aes(
+      x = description,
+      xend = description,
+      y = 0,
+      yend = pct_change,
+      color = mycolor
+    ),
+    size = 7,
+    alpha = 0.7,
+  ) +
+  scale_y_continuous(expand = expansion(mult = c(.2, NA))) + 
+  geom_label(
+    aes(label = description),
+    alpha = 0, 
+    hjust = "inward",
+    position = position_stack(vjust = 0),
+    size = 3,
+    # fill = mycolor,
+    label.size = 0, 
+    label.padding=unit(0.2, "lines"))+
+  # geom_label(aes(label = description), hjust = "inward", size = 2.5,
+  #               fill = "white", label.size = 0) +
+  # geom_label_repel(aes(label = description),
+  #   data = df_plot,
+  #   size = 1,
+  #   label.size = 0,
+  #   segment.color = NA
+  # ) +
+)
+  theme_ipsum_rc() +
+  labs(title = "Year-over-Year Change in Healthcare Services",
+       subtitle="UNC Medical Center",
+       x = "",
+       y = "Percent Change 2022 to 2021",
+       caption = "Source | UNC Health") + 
+  # scale_x_discrete(expand = c(0, 0)) +
+  # scale_y_continuous(expand = c(0,NA)) + 
+  scale_fill_viridis(option = "C", discrete = TRUE) +
+  theme(
+    plot.margin = margin(rep(15, 4)),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    axis.text.x=element_blank(),
+    axis.ticks.x=element_blank(),
+    axis.text.y=element_text(),
+    axis.ticks.y=element_blank(), 
+    legend.position = "none",
+    panel.border = element_blank(),
+    # plot.margin = margin(rep(15, 4))
+  ) +
+  coord_flip(clip = "off") +
+  geom_hline(yintercept = 100, colour = "red", size = 0.7, alpha = 0.7) +
+  geom_hline(yintercept = 0, colour = "darkslategrey", size = 0.7, alpha = 0.7) +
+  guides(fill = guide_legend(override.aes = list(alpha = 1))
+         )
+
+
+# scales::percent
+# (clip = "off")
+
+      # guides(x = guide_axis(angle = -20)) +
+      # theme_ipsum_rc()
 ```
  
  
