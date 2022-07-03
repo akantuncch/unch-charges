@@ -5,19 +5,226 @@ library(hrbrthemes)
 # library(ggridges)
 # library(ggrepel)
 # library(haven)
-# library(DataExplorer)
+library(DataExplorer)
+library(stringi)
 # library(matlab)
 
-charges_21 <- read_csv("data/561118388_uncmedicalcenter_cdmstandardcharges.csv",
+# charges_21 <- read_csv("data/561118388_uncmedicalcenter_cdmstandardcharges.csv",
+#                     #clean column names
+#                     name_repair = make_clean_names)
+# 
+# charges_22 <- read_csv("data/561118388_uncmedicalcenter_standardcharges_22.csv",
+#                     #clean column names
+#                     name_repair = make_clean_names)
+
+simple_21 <- read_csv("data/561118388_uncmedicalcenter_cdmstandardcharges.csv", col_select = c("charge_description":"max"),
                     #clean column names
                     name_repair = make_clean_names)
 
-charges_22 <- read_csv("data/561118388_uncmedicalcenter_standardcharges_22.csv",
+simple_21 <- simple_21 %>%
+  rename(charge = price,
+         minimum = min,
+         maximum = max) %>%
+  mutate(charge = parse_number(as.character(charge))) %>%
+  mutate(minimum = parse_number(as.character(minimum))) %>%
+  mutate(maximum = parse_number(as.character(maximum))
+         )
+
+simple_22 <- read_csv("data/561118388_uncmedicalcenter_standardcharges_22.csv", col_select = c("charge_description":"de_identified_maximum_negotiated_charge"),
                     #clean column names
                     name_repair = make_clean_names)
 
+simple_22 <- simple_22 %>%
+  rename(
+    minimum = de_identified_minimum_negotiated_charge, 
+    maximum = de_identified_maximum_negotiated_charge) %>%
+  mutate(charge = parse_number(as.character(charge))) %>%
+  mutate(minimum = parse_number(as.character(minimum))) %>%
+  mutate(maximum = parse_number(as.character(maximum))
+         )
+
+print(sprintf("The 2022 chargemaster contains %d service charges, while 2021 contains only %d (%0.2f %% increase from last year)",
+              nrow(simple_22),
+              nrow(simple_21),
+              100-100*nrow(simple_21)/nrow(simple_22)));
 
 ```
+
+```{r eda-comp}
+# Plot missing row values
+plot_missing(simple_21)
+plot_missing(simple_22)
+
+# Analyze missing values between datasets
+miss21 <- profile_missing(simple_21)
+miss22 <- profile_missing(simple_22)
+
+print(sprintf("The 2022 chargemaster contains %d missing codes and 2021 has %d missing codes",
+              miss22[[2,2]],
+              miss21[[2,2]]));
+
+rm(miss21)
+rm(miss22)
+```
+
+PLOTTING
+
+-JOIN ON CPT_HCPCS, CHARGE_DESCRPITION
+x = simple_22, y = simple_21
+Check row losses
+
+print(sprintf("Before inner join: %d, after %d (%0.2f %% decrease)",
+              nrow(x),
+              nrow(y),
+              100-100*nrow(y)/nrow(x)));
+              
+MUTATE NEW COL (22/21)/
+            mutate(pct_change = ((Profit/lag(Profit) - 1) * 100))
+            
+            
+            pct <- function(x) {x / lag(x) - 1}
+            df_vertical_growth %>% group_by(YEAR, VERTICAL) %>% mutate_at(funs=pct,Profit)
+            
+DROP OTHER COLUMNS
+SLICE MIN MAX 10
+GGPLOT
+
+```{r}
+compare <- simple_21 %>%
+  inner_join(simple_22, c("cpt_hcpcs", "charge_description"), na_matches = "never", keep = T, suffix = c(".21",".22"))
+
+df_compare <- simple_22 %>%
+  left_join(simple_21, by = "charge_description", na_matches = "never", keep = T, suffix = c(".22",".21"))
+
+plot_missing(compare)
+
+# Remove 'HC ' string from all descriptions
+df_compare <- modify(df_compare, ~str_remove_all(.,"HC "))
+
+df_diff <- df_compare %>%
+  mutate(charge.22 = parse_number(as.character(charge.22))) %>%
+  mutate(minimum.22 = parse_number(as.character(minimum.22))) %>%
+  mutate(maximum.22 = parse_number(as.character(minimum.22))) %>%
+      mutate(charge.21 = parse_number(as.character(charge.21))) %>%
+      mutate(minimum.21 = parse_number(as.character(minimum.21))) %>%
+      mutate(maximum.21 = parse_number(as.character(maximum.21))) %>%
+    group_by(charge_description.22) %>%
+      distinct() %>%
+      drop_na() %>%
+      mutate(pct_change = ((
+        charge.22 - charge.21
+      ) / charge.21) * 100) %>%
+      mutate(abs_change = charge.22 - charge.21) %>%
+      select(
+        charge_description.22,
+        code = cpt_hcpcs.22,
+        pct_change,
+        abs_change,
+        charge.22,
+        charge.21
+      ) %>%
+      arrange(desc(pct_change))
+
+
+# print(sprintf("There is a  %d percent difference between charges before join, after %d (%0.2f %% decrease)",
+#             (nrow(simple_22)/nrow(simple_21) - 1) *100,
+#               nrow(simple_21),
+#               nrow(compare),
+#               100-100*nrow(compare)/nrow(simple_21)));
+# 
+# pct_change = ((Profit/lag(Profit) - 1) * 100))
+
+```
+
+
+
+```{r plot}
+# library
+library(ggplot2)
+library(dplyr)
+
+# Add a column with your condition for the color
+# df_plot <- df_diff %>% 
+#   mutate(mycolor = ifelse(pct_change>0, "type1", "type2")) %>%
+#   tibble::rownames_to_column(var = "x") %>%
+#   arrange(x, pct_change) %>%
+#   group_by(pct_change) %>%
+#   mutate(rank=row_number(pct_change))
+
+
+# %>%
+#   mutate(rank = min_rank(-pct_change))
+
+  # mutate(x=dense_rank(desc(-pct_change)))
+
+  # mutate(x = row_number(pct_change))
+  
+# x <- seq(0, 2*pi, length.out=1000)
+
+# plot
+df_plot <- df_diff %>% 
+  mutate(mycolor = ifelse(pct_change>0, "type1", "type2")) %>%
+  tibble::rownames_to_column(var = "x") %>%
+  arrange(desc(x)) %>%
+    ggplot(aes(x = x, y = pct_change)) +
+    geom_segment(
+      aes(
+        x = x,
+        xend = x,
+        y = 0,
+        yend = pct_change,
+        color = mycolor
+      ),
+      size = 1.3,
+      alpha = 0.9
+    ) +
+    theme_light() +
+    theme(legend.position = "none",
+          panel.border = element_blank(),) +
+    xlab("") +
+    ylab("Value of Y")
+
+df_plot
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## SCRATCH 
 
 ```{r convert-numeric}
 charges_long_21 <- charges_21 %>%
@@ -81,7 +288,9 @@ rm(charges_long_22)
 ```
 
 ```{r}
-
+simple_21[, col_list] <-
+  lapply(simple_21[, col_list], function(x)
+    x <- car::recode(x, "charge"=as.numeric(); "min"=as.numeric(); "max"=as.numeric())
 ```
  
  
