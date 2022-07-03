@@ -134,19 +134,29 @@ plot_correlation(na.omit(charges_long), maxcat = 5L)
 
 ```{r top10, warning = FALSE}
 charges %>%
-  select(index, price, charge_description, cpt_hcpcs) %>% 
-  slice_max(price, n = 10) %>% 
-  ggplot(., aes(), group = 10) + 
-    geom_col(aes(x = charge_description, y = price)) + 
-      scale_x_discrete(label = function(x) stringr::str_trunc(x, 25)) +
-#coord_flip() + 
-      labs(title = "Top 10 Most Expensive Procedures",
-           subtitle="UNC Medical Center, Aug 2021",
-           x = "",
-           y = "Price (US Dollars)",
-           caption = "Source | UNC Health") + 
-      guides(x = guide_axis(angle = -20)) +
-      theme_ipsum_rc()
+  select(index, price, charge_description, cpt_hcpcs) %>%
+  slice_max(price, n = 10) %>%
+  ggplot(., aes(), group = 10) +
+  geom_col(aes(x = charge_description, y = price)) +
+  scale_x_discrete(
+    label = function(x)
+      stringr::str_trunc(x, 25)
+  ) +
+  coord_flip() +
+  labs(
+    title = "Top 10 Most Expensive Procedures",
+    subtitle = "UNC Medical Center, Aug 2021",
+    x = "",
+    y = "Price (US Dollars)",
+    caption = "Source | UNC Health"
+  ) +
+  guides(x = guide_axis(angle = -20)) +
+  theme_ipsum_rc()
+
+
+
+
+
 ```
 
 ```{r all-std-charges, warning = FALSE}
