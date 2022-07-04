@@ -50,7 +50,18 @@ TODO
 
 ## Data Scope
 
-The dataset was accessed on Aug 24, 2021 and exported as a .csv file. It includes:
+### 2021 Standard Charges
+
+The dataset was pulled Aug 24, 2021. Filename:561118388_uncmedicalcenter_cdmstandardcharges.csv. It includes:
+
+* 5011 charge bundles
+* Standard, minimum, maximum prices per ‘charge bundle’
+* 36 payors, including Blue Cross Blue Shield North Carolina (Note: one price per ‘charge bundle’)
+* Cross-referenced medical codes; Medicare Severity-Diagnosis Related Group (MS-DRG) / Current Procedural Terminology (CPT) / Healthcare Common Procedure Coding System (HCPCS), as available
+
+### 2022 Standard Charges
+
+The dataset was pulled Aug 24, 2021 Filename: 561118388_uncmedicalcenter_standardcharges_22.csv. It includes:
 
 * 5011 charge bundles
 * Standard, minimum, maximum prices per ‘charge bundle’
