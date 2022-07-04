@@ -1,4 +1,5 @@
 ```{r setup, echo=FALSE}
+
 library(tidyverse)
 library(janitor)
 library(hrbrthemes)
@@ -18,7 +19,8 @@ library(ggrepel)
 #                     #clean column names
 #                     name_repair = make_clean_names)
 
-simple_21 <- read_csv("data/561118388_uncmedicalcenter_cdmstandardcharges.csv", col_select = c("charge_description":"max"),
+
+simple_21 <- read_csv("../data/561118388_uncmedicalcenter_cdmstandardcharges.csv", col_select = c("charge_description":"max"),
                     #clean column names
                     name_repair = make_clean_names)
 
@@ -31,7 +33,7 @@ simple_21 <- simple_21 %>%
   mutate(maximum = parse_number(as.character(maximum))
          )
 
-simple_22 <- read_csv("data/561118388_uncmedicalcenter_standardcharges_22.csv", col_select = c("charge_description":"de_identified_maximum_negotiated_charge"),
+simple_22 <- read_csv("../data/561118388_uncmedicalcenter_standardcharges_22.csv", col_select = c("charge_description":"de_identified_maximum_negotiated_charge"),
                     #clean column names
                     name_repair = make_clean_names)
 
@@ -247,7 +249,7 @@ ggplot(data = df_plot, aes(description, pct_change)) +
   )
 
 # ggsave("images/charge-movers22.png", bg = "white")
-ggsave("images/charge-movers22.png", bg = "white", width = 10, height = 10, units = "in", dpi = 300)
+# ggsave("images/charge-movers22.png", bg = "white", width = 10, height = 10, units = "in", dpi = 300)
 
 ```
 
