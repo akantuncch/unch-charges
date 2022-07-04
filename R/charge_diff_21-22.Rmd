@@ -89,67 +89,25 @@ df_clean22 <- df_source |>
     min = parse_number(as.character(de_identified_minimum_negotiated_charge)),
     max = parse_number(as.character(de_identified_maximum_negotiated_charge)),
     charge_description = str_remove_all(charge_description, "HC ")) |>
-  select(year,
+    select(year,
          charge_description,
          cpt_hcpcs,
          price,
          min,
          max) |>
-  filter(year == 2022)
+    filter(year == 2022)
   
 # merge long
 df_diff <- bind_rows(df_clean22, df_clean21)
 
-# Change year to date col
-df_clean21$year <- df_clean21
-
-# compare data charge differences
-tmp <- df_diff %>%
-  drop_na(price) |>
-  distinct() |>
-  group_by(year) |>
-  # rowwise(year) |>
-  mutate(percent = price / sum(price) * 100)
-
-tmp <- df_diff |>
-  group_by(year) |>
-  mutate(per = prop.table(count) * 100)
-
-
-
-  
-  
-  
-  mutate(yoy_perc = ((charge.22 - charge.21) / charge.21) * 100) %>%
-  mutate(yoy_abs = charge.22 - charge.21) %>%
-  select(description = charge_description.22,
-         code = cpt_hcpcs.22,
-         pct_change,
-         abs_change,
-         charge.22,
-         charge.21) %>%
-  distinct()
-
-df_diff
-
-
-
-
-# clean_data <- source_data |>
-#   clean_names() |>
-#   select(
-#     source,
-#     charge_description,
-#     cpt_hcpcs,
-#     price,
-#     min,
-#     max,
-#     de_identified_minimum_negotiated_charge,
-#     de_identified_maximum_negotiated_charge
-#   ) |>
-#   rename(min = 21)
-        
-
+# calculate percent change
+df_percent <- df_diff %>%
+  arrange(charge_description, year) %>%
+  group_by(charge_description) %>%
+  mutate(percent_change = (last(price) - first(price))/first(price),
+         min_change = (last(min) - first(min))/first(min),
+         max_change = (last(max) - first(max))/first(max)) %>%
+  ungroup()
 
 
 
@@ -464,7 +422,63 @@ rm(charges_22)
 rm(charges_long_21)
 rm(charges_long_22)
 
+# tmp <- df_diff |>
+#   group_by(year) |>
+#     mutate(price_lag = lag(price),
+#            diff = price - price_lag) |>
+#     na.omit() |>
+#   ungroup() |>
+#   mutate(percentage = diff/price_lag)
 
+# df_diff$pct <- (df_diff$year - charge.21) / charge.21) * 100)
+
+# compare data charge differences
+tmp <- df_diff %>%
+  drop_na(price) |>
+  distinct() |>
+  select(price, year, charge_description) |>
+  group_by(year, price) |>
+  mutate(
+    Count = scales::percent(price))
+
+tmp <- df_diff |>
+  group_by(year) |>
+  mutate(per = prop.table(count) * 100)
+
+
+
+  
+  
+  
+  mutate(yoy_perc = ((charge.22 - charge.21) / charge.21) * 100) %>%
+  mutate(yoy_abs = charge.22 - charge.21) %>%
+  select(description = charge_description.22,
+         code = cpt_hcpcs.22,
+         pct_change,
+         abs_change,
+         charge.22,
+         charge.21) %>%
+  distinct()
+
+df_diff
+
+
+
+
+# clean_data <- source_data |>
+#   clean_names() |>
+#   select(
+#     source,
+#     charge_description,
+#     cpt_hcpcs,
+#     price,
+#     min,
+#     max,
+#     de_identified_minimum_negotiated_charge,
+#     de_identified_maximum_negotiated_charge
+#   ) |>
+#   rename(min = 21)
+        
 
 ```
 
