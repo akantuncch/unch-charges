@@ -15,7 +15,7 @@ library(ggrepel)
 #                     #clean column names
 #                     name_repair = make_clean_names)
 # 
-# charges_22 <- read_csv("data/561118388_uncmedicalcenter_standardcharges_22.csv",
+# charges_22 <- read_csv("../data/561118388_uncmedicalcenter_standardcharges_22.csv",
 #                     #clean column names
 #                     name_repair = make_clean_names)
 
@@ -52,6 +52,122 @@ print(sprintf("The 2022 chargemaster contains %d service charges, while 2021 con
               100-100*nrow(simple_21)/nrow(simple_22)));
 
 ```
+
+```{r clean-import}
+library(tidyverse)
+library(janitor)
+library(hrbrthemes)
+
+# specify  directory, then read a list of files
+file_path <- here::here("data/")
+file_list <- fs::dir_ls(file_path, regexp = ".csv$")
+
+# return a single data frame, combine data
+df_source = file_list |>
+  purrr::map_dfr(read_csv, .id = "source") |>
+  clean_names()
+
+# add column for year based on source
+df_source$year <- with(df_source, ifelse(source == "C:/Users/akant/Documents/unch-charges/data/561118388_uncmedicalcenter_cdmstandardcharges.csv", 2021, 2022))
+
+# gather 2021 data
+df_clean21 <- df_source |>
+  mutate(
+    charge_description = str_remove_all(charge_description, "HC "),
+    charge = parse_number(as.character(charge)),
+    price = parse_number(as.character(price)),
+    min = parse_number(as.character(min)),
+    max = parse_number(as.character(max))) |>
+    select(year, charge_description, cpt_hcpcs, price, min, max) |>
+    filter(year == 2021
+      )
+
+# gather 2022 data and clean cols
+df_clean22 <- df_source |>
+  mutate(
+    price = parse_number(as.character(charge)),
+    min = parse_number(as.character(de_identified_minimum_negotiated_charge)),
+    max = parse_number(as.character(de_identified_maximum_negotiated_charge)),
+    charge_description = str_remove_all(charge_description, "HC ")) |>
+  select(year,
+         charge_description,
+         cpt_hcpcs,
+         price,
+         min,
+         max) |>
+  filter(year == 2022)
+  
+# merge long
+df_diff <- bind_rows(df_clean22, df_clean21)
+
+# Change year to date col
+df_clean21$year <- df_clean21
+
+# compare data charge differences
+tmp <- df_diff %>%
+  drop_na(price) |>
+  distinct() |>
+  group_by(year) |>
+  # rowwise(year) |>
+  mutate(percent = price / sum(price) * 100)
+
+tmp <- df_diff |>
+  group_by(year) |>
+  mutate(per = prop.table(count) * 100)
+
+
+
+  
+  
+  
+  mutate(yoy_perc = ((charge.22 - charge.21) / charge.21) * 100) %>%
+  mutate(yoy_abs = charge.22 - charge.21) %>%
+  select(description = charge_description.22,
+         code = cpt_hcpcs.22,
+         pct_change,
+         abs_change,
+         charge.22,
+         charge.21) %>%
+  distinct()
+
+df_diff
+
+
+
+
+# clean_data <- source_data |>
+#   clean_names() |>
+#   select(
+#     source,
+#     charge_description,
+#     cpt_hcpcs,
+#     price,
+#     min,
+#     max,
+#     de_identified_minimum_negotiated_charge,
+#     de_identified_maximum_negotiated_charge
+#   ) |>
+#   rename(min = 21)
+        
+
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ```{r eda-comp}
 # Plot missing row values
@@ -170,7 +286,7 @@ df_plot <- df_slice %>%
 # df_plot <- transform(df_plot, x = fct_shuffle(df_plot$x))
 
 # Saving df_diff to other project
-write.csv(df_diff, file = "C:\\Users\\akant\\Documents\\blog\\content\\post\\2022-07-03-why-healthcare-pricing-transparncy-is-hard\\df_dff.csv")
+# write.csv(df_diff, file = "C:\\Users\\akant\\Documents\\blog\\content\\post\\2022-07-03-why-healthcare-pricing-transparncy-is-hard\\df_dff.csv")
 
 
 
@@ -463,6 +579,24 @@ ggplot(data = df_plot, aes(description, pct_change)) +
 
       # guides(x = guide_axis(angle = -20)) +
       # theme_ipsum_rc()
+```
+ 
+```{r functions}
+
+csv_clean <- function(x) {
+  df <- lapply()
+  # df <- select({{ var }}, c(2:6))
+}
+
+csv_clean(source_data)
+
+x <- 10
+f1 <- function(x) {
+  function() {
+    x + 10
+  }
+}
+f1(1)()
 ```
  
  
