@@ -169,7 +169,8 @@ df_plot <- df_slice %>%
 
 # df_plot <- transform(df_plot, x = fct_shuffle(df_plot$x))
 
-
+# Saving df_diff to other project
+write.csv(df_diff, file = "C:\\Users\\akant\\Documents\\blog\\content\\post\\2022-07-03-why-healthcare-pricing-transparncy-is-hard\\df_dff.csv")
 
 
 
