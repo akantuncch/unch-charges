@@ -104,9 +104,11 @@ df_diff <- bind_rows(df_clean22, df_clean21)
 df_percent <- df_diff %>%
   arrange(charge_description, year) %>%
   group_by(charge_description) %>%
-  mutate(percent_change = (last(price) - first(price))/first(price),
-         min_change = (last(min) - first(min))/first(min),
-         max_change = (last(max) - first(max))/first(max)) %>%
+  mutate(
+    percent_change = (last(price) - first(price)) / first(price),
+    min_change = (last(min) - first(min)) / first(min),
+    max_change = (last(max) - first(max)) / first(max)
+  ) %>%
   ungroup()
 
 
@@ -168,7 +170,7 @@ GGPLOT
 
 ```{r}
 compare <- simple_21 %>%
-  inner_join(simple_22, c("cpt_hcpcs", "charge_description"), na_matches = "never", keep = T, suffix = c(".21",".22"))
+  inner_join(simple_22, c("cpt_hcpcs", "charge_description"), na_matches = "never", keep = T, suffix = c(".21", ".22"))
 
 df_compare <- simple_22 %>%
   left_join(simple_21, by = "charge_description", na_matches = "never", keep = T, suffix = c(".22",".21"))
@@ -202,29 +204,6 @@ df_diff <- df_compare %>%
 library(ggplot2)
 library(dplyr)
 
-# Add a column with your condition for the color
-# df_plot <- df_diff %>% 
-#   mutate(mycolor = ifelse(pct_change>0, "type1", "type2")) %>%
-#   tibble::rownames_to_column(var = "x") %>%
-#   arrange(x, pct_change) %>%
-#   group_by(pct_change) %>%
-#   mutate(rank=row_number(pct_change))
-
-
-# %>%
-#   mutate(rank = min_rank(-pct_change))
-
-  # mutate(x=dense_rank(desc(-pct_change)))
-
-  # mutate(x = row_number(pct_change))
-  
-# x <- seq(0, 2*pi, length.out=1000)
-
-# df_plot <- df_slice %>% 
-#   mutate(mycolor = ifelse(pct_change>0, "type1", "type2")) %>%
-#   tibble::rownames_to_column(var = "x") %>%
-#   arrange(x, desc(-pct_change))
-
 
 # plot
 df_slice <- bind_rows(
@@ -236,19 +215,8 @@ df_plot <- df_slice %>%
   mutate(mycolor = ifelse(pct_change>0, "type1", "type2")) %>%
   tibble::rownames_to_column(var = "index") %>%
   arrange(pct_change) %>%
-  mutate(description=factor(description, description))
+  # mutate(description=factor(description, description))
 
-# %>%
-#   arrange(desc(pct_change))
-
-# df_plot <- transform(df_plot, x = fct_shuffle(df_plot$x))
-
-# Saving df_diff to other project
-# write.csv(df_diff, file = "C:\\Users\\akant\\Documents\\blog\\content\\post\\2022-07-03-why-healthcare-pricing-transparncy-is-hard\\df_dff.csv")
-
-
-
-# df_plot
 ```
 
 
@@ -479,6 +447,30 @@ df_diff
 #   ) |>
 #   rename(min = 21)
         
+# Add a column with your condition for the color
+# df_plot <- df_diff %>% 
+#   mutate(mycolor = ifelse(pct_change>0, "type1", "type2")) %>%
+#   tibble::rownames_to_column(var = "x") %>%
+#   arrange(x, pct_change) %>%
+#   group_by(pct_change) %>%
+#   mutate(rank=row_number(pct_change))
+
+
+# %>%
+#   mutate(rank = min_rank(-pct_change))
+
+  # mutate(x=dense_rank(desc(-pct_change)))
+
+  # mutate(x = row_number(pct_change))
+  
+# x <- seq(0, 2*pi, length.out=1000)
+
+# df_plot <- df_slice %>% 
+#   mutate(mycolor = ifelse(pct_change>0, "type1", "type2")) %>%
+#   tibble::rownames_to_column(var = "x") %>%
+#   arrange(x, desc(-pct_change))
+
+
 
 ```
 
