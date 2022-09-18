@@ -69,6 +69,8 @@ charges_clean <- charges %>%
   arrange(runif(nrow(.)))
 
 
+
+
 # Remove $ and , from string, convert to numeric
 charges_clean$price = as.double(gsub("[\\$,]", "", charges_clean$price))
 charges_clean$min = as.double(gsub("[\\$,]", "", charges_clean$min))
